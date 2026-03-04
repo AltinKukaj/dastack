@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getFeatureFlags } from "@/lib/features";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Exposes which optional features are enabled.
  *
@@ -11,16 +13,23 @@ import { getFeatureFlags } from "@/lib/features";
 export function GET() {
   const flags = getFeatureFlags();
 
-  return NextResponse.json({
-    auth: flags.auth,
-    email: flags.email,
-    passkey: flags.passkey,
-    providers: {
-      discord: flags.discord,
-      google: flags.google,
-      github: flags.github,
+  return NextResponse.json(
+    {
+      auth: flags.auth,
+      email: flags.email,
+      passkey: flags.passkey,
+      providers: {
+        discord: flags.discord,
+        google: flags.google,
+        github: flags.github,
+      },
+      stripe: flags.stripe,
+      captcha: flags.captcha,
     },
-    stripe: flags.stripe,
-    captcha: flags.captcha,
-  });
+    {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    },
+  );
 }

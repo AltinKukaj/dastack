@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getFeatureFlags } from "@/lib/features";
 
+export const dynamic = "force-dynamic";
+
 const stack = [
   { name: "Next.js", href: "https://nextjs.org" },
   { name: "React", href: "https://react.dev" },
