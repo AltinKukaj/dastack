@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
+import { TurnstileWidget } from "./turnstile-widget";
 
 type SocialProvider = "discord" | "google" | "github";
 
@@ -58,27 +59,6 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
       );
   }, []);
 
-  useEffect(() => {
-    if (!config?.captchaEnabled) return;
-    const siteKey = config.captchaSiteKey;
-    if (!siteKey) return;
-    const handler = (e: Event) => setCaptchaToken((e as CustomEvent).detail);
-    window.addEventListener("captcha-solved", handler);
-    const existingToken = (window as Window & { __captchaToken?: string })
-      .__captchaToken;
-    if (existingToken) {
-      setCaptchaToken(existingToken);
-    }
-    if (!document.getElementById("turnstile-script")) {
-      const script = document.createElement("script");
-      script.id = "turnstile-script";
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-      script.async = true;
-      document.head.appendChild(script);
-    }
-    return () => window.removeEventListener("captcha-solved", handler);
-  }, [config?.captchaEnabled, config?.captchaSiteKey]);
-
   const getCaptchaHeaders = (): Record<string, string> => {
     if (config?.captchaEnabled && captchaToken) {
       return { "x-captcha-response": captchaToken };
@@ -89,7 +69,9 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const ensureCaptchaIfRequired = (): boolean => {
     if (!config?.captchaEnabled) return true;
     if (captchaToken) return true;
-    setError("Please complete the captcha challenge and try again.");
+    setError(
+      "Captcha verification is still missing. If you use an ad/privacy blocker, allow challenges.cloudflare.com and try again.",
+    );
     return false;
   };
 
@@ -343,20 +325,16 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
       )}
 
       {captchaEnabled && captchaSiteKey && (
-        <div className="flex justify-center">
-          <div
-            className="cf-turnstile"
-            data-sitekey={captchaSiteKey}
-            data-callback="onTurnstileSuccess"
-            data-theme="dark"
-          />
-          <script
-            // biome-ignore lint: inline script for Turnstile callback
-            dangerouslySetInnerHTML={{
-              __html: `window.onTurnstileSuccess = function(token) { window.__captchaToken = token; window.dispatchEvent(new CustomEvent('captcha-solved', { detail: token })); };`,
-            }}
-          />
-        </div>
+        <TurnstileWidget
+          siteKey={captchaSiteKey}
+          onToken={(token) => setCaptchaToken(token)}
+          onUnavailable={() => {
+            setCaptchaToken(null);
+            setError(
+              "Captcha failed to load. Allow challenges.cloudflare.com (or disable extension blocking) and refresh.",
+            );
+          }}
+        />
       )}
 
       {error && (

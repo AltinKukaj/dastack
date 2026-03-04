@@ -8,10 +8,12 @@ permissions:
   contents: read
   packages: write
 
+# Use secrets first, fall back to variables (Settings → Secrets and variables → Actions).
+# If you use an Environment (e.g. production), add: environment: production (or your env name) under the job.
 env:
-  DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-  DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-  DOKPLOY_APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
+  DOKPLOY_URL: ${{ secrets.DOKPLOY_URL || vars.DOKPLOY_URL }}
+  DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY || vars.DOKPLOY_API_KEY }}
+  DOKPLOY_APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID || vars.DOKPLOY_APPLICATION_ID }}
 
 jobs:
   build-and-deploy:
@@ -77,7 +79,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Trigger Dokploy deployment via API (only if secrets are set)
+      # Trigger Dokploy deployment via API (only if secrets/vars are set)
+      - name: Dokploy deploy status
+        run: |
+          if [ -n "$DOKPLOY_URL" ] && [ -n "$DOKPLOY_API_KEY" ] && [ -n "$DOKPLOY_APPLICATION_ID" ]; then
+            echo "Dokploy deploy: will run (all DOKPLOY_* set)"
+          else
+            echo "Dokploy deploy: skipped (missing DOKPLOY_URL, DOKPLOY_API_KEY, or DOKPLOY_APPLICATION_ID)"
+            echo "Add them as Repository secrets or variables (Settings → Secrets and variables → Actions)."
+            echo "If using an Environment, add 'environment: <name>' to the build-and-deploy job."
+          fi
       - name: Trigger Dokploy deploy
         if: env.DOKPLOY_URL != '' && env.DOKPLOY_API_KEY != '' && env.DOKPLOY_APPLICATION_ID != ''
         run: |
