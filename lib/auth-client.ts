@@ -10,8 +10,42 @@ import {
 import { createAuthClient } from "better-auth/react";
 import { ac, roleDefinitions } from "./permissions";
 
+function isLocalHostname(hostname: string): boolean {
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+  );
+}
+
+function getResolvedAuthBaseUrl(): string | undefined {
+  const configured = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (typeof window === "undefined") {
+    return configured;
+  }
+
+  const currentOrigin = window.location.origin;
+  if (!configured) return currentOrigin;
+
+  try {
+    const configuredUrl = new URL(configured);
+    const currentUrl = new URL(currentOrigin);
+
+    // Avoid hard-failing auth when a localhost URL is accidentally shipped
+    // to production clients (or vice versa).
+    const configuredLocal = isLocalHostname(configuredUrl.hostname);
+    const currentLocal = isLocalHostname(currentUrl.hostname);
+    if (configuredLocal !== currentLocal) {
+      return currentOrigin;
+    }
+
+    return configuredUrl.origin;
+  } catch {
+    return currentOrigin;
+  }
+}
+
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_APP_URL,
+  baseURL: getResolvedAuthBaseUrl(),
   plugins: [
     magicLinkClient(),
     adminClient({

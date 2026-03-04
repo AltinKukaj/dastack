@@ -29,6 +29,22 @@ interface SignInFormProps {
   callbackURL: string;
 }
 
+function getSocialRedirectUrl(result: unknown): string | null {
+  if (!result || typeof result !== "object") return null;
+
+  const directUrl =
+    "url" in result && typeof result.url === "string" ? result.url : null;
+  if (directUrl) return directUrl;
+
+  if (!("data" in result) || !result.data || typeof result.data !== "object") {
+    return null;
+  }
+
+  return "url" in result.data && typeof result.data.url === "string"
+    ? result.data.url
+    : null;
+}
+
 export function SignInForm({ callbackURL }: SignInFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -244,11 +260,22 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setLoading(provider);
     try {
       const headers = getCaptchaHeaders();
-      await signIn.social({
+      const result = await signIn.social({
         provider,
         callbackURL,
         fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
       });
+
+      const redirectUrl = getSocialRedirectUrl(result);
+      if (redirectUrl) {
+        window.location.assign(redirectUrl);
+        return;
+      }
+
+      setError(
+        "Could not start social sign-in redirect. Verify NEXT_PUBLIC_APP_URL and BETTER_AUTH_URL match this domain.",
+      );
+      setLoading(null);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
