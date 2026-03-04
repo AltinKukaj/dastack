@@ -20,13 +20,16 @@ function handler(req: Request) {
 
   const url = new URL(req.url);
   if (url.pathname.endsWith("/api/auth/error")) {
-    const oauthError = url.searchParams.get("error");
-    if (oauthError) {
-      const redirectTarget = new URL("/auth", req.url);
-      redirectTarget.searchParams.set("tab", "sign-in");
-      redirectTarget.searchParams.set("oauthError", oauthError);
-      return NextResponse.redirect(redirectTarget);
-    }
+    // In production behind reverse proxies, req.url may resolve to an internal
+    // origin (e.g. 0.0.0.0:3000). Prefer BETTER_AUTH_URL for user-facing redirects.
+    const redirectBase = process.env.BETTER_AUTH_URL ?? req.url;
+    const redirectTarget = new URL("/auth", redirectBase);
+    redirectTarget.searchParams.set("tab", "sign-in");
+    redirectTarget.searchParams.set(
+      "oauthError",
+      url.searchParams.get("error") ?? "oauth_flow_failed",
+    );
+    return NextResponse.redirect(redirectTarget);
   }
 
   const { toNextJsHandler } = require("better-auth/next-js");

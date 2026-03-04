@@ -181,6 +181,8 @@ function createAuth() {
             discord: {
               clientId: env.DISCORD_CLIENT_ID,
               clientSecret: env.DISCORD_CLIENT_SECRET,
+              // Avoid silent OAuth failures that can happen with prompt=none.
+              prompt: "consent",
             },
           }
         : {}),
