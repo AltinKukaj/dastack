@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import { authClient, signIn } from "@/lib/auth-client";
+import { authClient, signIn, signOut } from "@/lib/auth-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
@@ -259,6 +259,9 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setError(null);
     setLoading(provider);
     try {
+      // Clear any stale session cookie before starting a new OAuth state flow.
+      await signOut();
+
       const headers = getCaptchaHeaders();
       const result = await signIn.social({
         provider,
@@ -279,7 +282,15 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
-      if (message.toLowerCase().includes("403")) {
+      const normalized = message.toLowerCase();
+      if (
+        normalized.includes("please_restart_the_process") ||
+        normalized.includes("state")
+      ) {
+        setError(
+          "Social sign-in session expired. Please try again (this refreshes the OAuth state cookie).",
+        );
+      } else if (normalized.includes("403")) {
         setError(
           "Social sign-in was blocked. If captcha or privacy blocking is enabled, try password/magic link or disable strict content blocking and try again.",
         );

@@ -18,6 +18,17 @@ function handler(req: Request) {
     );
   }
 
+  const url = new URL(req.url);
+  if (url.pathname.endsWith("/api/auth/error")) {
+    const oauthError = url.searchParams.get("error");
+    if (oauthError) {
+      const redirectTarget = new URL("/auth", req.url);
+      redirectTarget.searchParams.set("tab", "sign-in");
+      redirectTarget.searchParams.set("oauthError", oauthError);
+      return NextResponse.redirect(redirectTarget);
+    }
+  }
+
   const { toNextJsHandler } = require("better-auth/next-js");
   const { GET, POST } = toNextJsHandler(auth);
   if (req.method === "GET") return GET(req);

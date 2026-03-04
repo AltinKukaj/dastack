@@ -10,6 +10,18 @@ import { SignUpForm } from "../components/sign-up-form";
 
 type AuthTab = "sign-in" | "sign-up";
 
+function getOauthErrorMessage(errorCode: string | null): string | null {
+  if (!errorCode) return null;
+  if (
+    errorCode === "please_restart_the_process" ||
+    errorCode === "state_not_found" ||
+    errorCode === "state_mismatch"
+  ) {
+    return "Your social login session expired before callback validation. Please try again.";
+  }
+  return `Social sign-in failed (${errorCode.replace(/_/g, " ")}). Please try again.`;
+}
+
 export default function AuthPage() {
   return (
     <Suspense
@@ -30,6 +42,9 @@ function AuthContent() {
   const callbackURL = getSafeCallbackUrl(
     searchParams.get("callbackUrl"),
     "/dashboard",
+  );
+  const oauthErrorMessage = getOauthErrorMessage(
+    searchParams.get("oauthError") ?? searchParams.get("error"),
   );
   const initialTab =
     searchParams.get("tab") === "sign-up" ? "sign-up" : "sign-in";
@@ -143,6 +158,11 @@ function AuthContent() {
                   ? "Sign in with your credentials or a provider."
                   : "Fill in the details below to get started."}
               </p>
+              {oauthErrorMessage && (
+                <p className="mt-3 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+                  {oauthErrorMessage}
+                </p>
+              )}
             </div>
           </div>
 
