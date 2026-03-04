@@ -20,6 +20,7 @@ interface AuthConfig {
   passkeyEnabled: boolean;
   providers: ProviderConfig;
   captchaEnabled: boolean;
+  captchaSiteKey: string | null;
 }
 
 interface SignInFormProps {
@@ -51,6 +52,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           passkeyEnabled: data.passkey ?? false,
           providers: data.providers,
           captchaEnabled: data.captcha ?? false,
+          captchaSiteKey: data.captchaSiteKey ?? null,
         }),
       )
       .catch(() =>
@@ -59,6 +61,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           passkeyEnabled: false,
           providers: { discord: false, google: false, github: false },
           captchaEnabled: false,
+          captchaSiteKey: null,
         }),
       );
   }, []);
@@ -95,7 +98,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   useEffect(() => {
     if (!config?.captchaEnabled) return;
-    const siteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY;
+    const siteKey = config.captchaSiteKey;
     if (!siteKey) return;
     if (document.getElementById("turnstile-script")) return;
     const script = document.createElement("script");
@@ -106,13 +109,20 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     const handler = (e: Event) => setCaptchaToken((e as CustomEvent).detail);
     window.addEventListener("captcha-solved", handler);
     return () => window.removeEventListener("captcha-solved", handler);
-  }, [config?.captchaEnabled]);
+  }, [config?.captchaEnabled, config?.captchaSiteKey]);
 
   const getCaptchaHeaders = (): Record<string, string> => {
     if (config?.captchaEnabled && captchaToken) {
       return { "x-captcha-response": captchaToken };
     }
     return {};
+  };
+
+  const ensureCaptchaIfRequired = (): boolean => {
+    if (!config?.captchaEnabled) return true;
+    if (captchaToken) return true;
+    setError("Please complete the captcha challenge and try again.");
+    return false;
   };
 
   const handlePasswordSignIn = async () => {
@@ -181,6 +191,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   const handleMagicLink = async () => {
     if (!email.trim()) return;
+    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading("magic");
 
@@ -221,6 +232,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   };
 
   const handleSocial = async (provider: SocialProvider) => {
+    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading(provider);
     try {
@@ -252,7 +264,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   const emailEnabled = config?.emailEnabled ?? false;
   const passkeyEnabled = config?.passkeyEnabled ?? false;
   const captchaEnabled = config?.captchaEnabled ?? false;
-  const captchaSiteKey = process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY;
+  const captchaSiteKey = config?.captchaSiteKey ?? null;
 
   if (twoFactorPending) {
     return (

@@ -18,6 +18,7 @@ interface AuthConfig {
   emailEnabled: boolean;
   providers: ProviderConfig;
   captchaEnabled: boolean;
+  captchaSiteKey: string | null;
 }
 
 interface SignUpFormProps {
@@ -34,6 +35,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/features")
@@ -43,6 +45,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
           emailEnabled: data.email ?? false,
           providers: data.providers,
           captchaEnabled: data.captcha ?? false,
+          captchaSiteKey: data.captchaSiteKey ?? null,
         }),
       )
       .catch(() =>
@@ -50,9 +53,39 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
           emailEnabled: false,
           providers: { discord: false, google: false, github: false },
           captchaEnabled: false,
+          captchaSiteKey: null,
         }),
       );
   }, []);
+
+  useEffect(() => {
+    if (!config?.captchaEnabled) return;
+    const siteKey = config.captchaSiteKey;
+    if (!siteKey) return;
+    if (document.getElementById("turnstile-script")) return;
+    const script = document.createElement("script");
+    script.id = "turnstile-script";
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    document.head.appendChild(script);
+    const handler = (e: Event) => setCaptchaToken((e as CustomEvent).detail);
+    window.addEventListener("captcha-solved", handler);
+    return () => window.removeEventListener("captcha-solved", handler);
+  }, [config?.captchaEnabled, config?.captchaSiteKey]);
+
+  const getCaptchaHeaders = (): Record<string, string> => {
+    if (config?.captchaEnabled && captchaToken) {
+      return { "x-captcha-response": captchaToken };
+    }
+    return {};
+  };
+
+  const ensureCaptchaIfRequired = (): boolean => {
+    if (!config?.captchaEnabled) return true;
+    if (captchaToken) return true;
+    setError("Please complete the captcha challenge and try again.");
+    return false;
+  };
 
   const handleEmailSignUp = async () => {
     if (!name.trim() || !email.trim() || !password) return;
@@ -96,10 +129,16 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   };
 
   const handleSocial = async (provider: SocialProvider) => {
+    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading(provider);
     try {
-      await signIn.social({ provider, callbackURL });
+      const headers = getCaptchaHeaders();
+      await signIn.social({
+        provider,
+        callbackURL,
+        fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setLoading(null);
@@ -119,6 +158,8 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const enabledSocials = config
     ? socialButtons.filter((b) => config.providers[b.key])
     : [];
+  const captchaEnabled = config?.captchaEnabled ?? false;
+  const captchaSiteKey = config?.captchaSiteKey ?? null;
 
   if (success) {
     return (
@@ -293,6 +334,23 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
             ))}
           </div>
         </>
+      )}
+
+      {captchaEnabled && captchaSiteKey && (
+        <div className="flex justify-center">
+          <div
+            className="cf-turnstile"
+            data-sitekey={captchaSiteKey}
+            data-callback="onTurnstileSuccess"
+            data-theme="dark"
+          />
+          <script
+            // biome-ignore lint: inline script for Turnstile callback
+            dangerouslySetInnerHTML={{
+              __html: `window.onTurnstileSuccess = function(token) { window.__captchaToken = token; window.dispatchEvent(new CustomEvent('captcha-solved', { detail: token })); };`,
+            }}
+          />
+        </div>
       )}
 
       {error && (

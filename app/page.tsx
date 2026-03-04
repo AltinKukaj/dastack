@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getFeatureFlags } from "@/lib/features";
+import { HomeAuthLink } from "./components/home-auth-link";
 
 export const dynamic = "force-dynamic";
 
@@ -65,14 +66,7 @@ export default function Home() {
             >
               Docs
             </a>
-            {flags.auth && (
-              <Link
-                href="/auth"
-                className="rounded-lg border border-neutral-800 px-4 py-1.5 text-[13px] text-neutral-400 transition hover:border-neutral-700 hover:text-white"
-              >
-                Sign in
-              </Link>
-            )}
+            <HomeAuthLink initialVisible={flags.auth} />
           </nav>
         </div>
       </header>
