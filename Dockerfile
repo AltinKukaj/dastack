@@ -6,8 +6,9 @@
 FROM oven/bun:1.3.10 AS deps
 WORKDIR /app
 
-# Copy only manifests first (better Docker cache)
-COPY package.json bun.lock* ./
+# Copy manifests and Prisma schema/config first (needed by postinstall prisma generate)
+COPY package.json bun.lock* prisma.config.ts ./
+COPY prisma/schema.prisma ./prisma/schema.prisma
 
 # Install deps (prod+dev because we build in container)
 RUN bun install --frozen-lockfile
