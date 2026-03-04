@@ -1,0 +1,87 @@
+name: Build & Deploy (GHCR + Dokploy)
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+  DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+  DOKPLOY_APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Quality gates ──────────────────────────────────────────────────
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          SKIP_ENV_VALIDATION: 1
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Type check
+        run: bun run type-check
+        env:
+          SKIP_ENV_VALIDATION: 1
+
+      # ── Docker build & push ────────────────────────────────────────────
+      # GHCR image names must be lowercase (owner/repo).
+      - name: Compute image name (lowercase)
+        id: img
+        run: |
+          REPO_LC="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "name=ghcr.io/${REPO_LC}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Trigger Dokploy deployment via API (only if secrets are set)
+      - name: Trigger Dokploy deploy
+        if: env.DOKPLOY_URL != '' && env.DOKPLOY_API_KEY != '' && env.DOKPLOY_APPLICATION_ID != ''
+        run: |
+          curl -sS -X POST \
+            "${DOKPLOY_URL}/api/application.deploy" \
+            -H "accept: application/json" \
+            -H "content-type: application/json" \
+            -H "x-api-key: ${DOKPLOY_API_KEY}" \
+            -d "{\"applicationId\":\"${DOKPLOY_APPLICATION_ID}\"}"
