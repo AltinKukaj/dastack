@@ -65,6 +65,8 @@ What it does on push to `main`/`master`:
 
 If these secrets are missing, the workflow still builds/pushes the image and skips Dokploy trigger.
 
+For pull requests and non-deploy quality checks, use **`.github/workflows/ci.yml`** (lint, type-check, tests, and build).
+
 ---
 
 ## Generic Docker host (alternative)

@@ -11,21 +11,45 @@
  * @see README.md - Feature Toggles section
  */
 
-let warnedForPartialConfig = false;
+const globalForFeatureWarnings = globalThis as unknown as {
+  __dastackWarnedForPartialConfig?: boolean;
+};
+
+function isLocalhostAuthUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
 
 function warnForPartialConfig({
   authEnabled,
   hasAnyAuthInput,
   hasAnyStripeInput,
   hasAnyCaptchaInput,
+  captchaConfigured,
+  captchaEnabled,
+  localhostAuth,
+  captchaAllowedOnLocalhost,
 }: {
   authEnabled: boolean;
   hasAnyAuthInput: boolean;
   hasAnyStripeInput: boolean;
   hasAnyCaptchaInput: boolean;
+  captchaConfigured: boolean;
+  captchaEnabled: boolean;
+  localhostAuth: boolean;
+  captchaAllowedOnLocalhost: boolean;
 }) {
   if (process.env.NODE_ENV !== "development") return;
-  if (warnedForPartialConfig) return;
+  if (globalForFeatureWarnings.__dastackWarnedForPartialConfig) return;
 
   const warnings: string[] = [];
 
@@ -47,9 +71,20 @@ function warnForPartialConfig({
     );
   }
 
+  if (
+    captchaConfigured &&
+    localhostAuth &&
+    !captchaAllowedOnLocalhost &&
+    !captchaEnabled
+  ) {
+    warnings.push(
+      "Captcha is disabled on localhost by default. Set ENABLE_CAPTCHA_ON_LOCALHOST=true and allow localhost in Turnstile to test captcha locally.",
+    );
+  }
+
   if (warnings.length === 0) return;
 
-  warnedForPartialConfig = true;
+  globalForFeatureWarnings.__dastackWarnedForPartialConfig = true;
   console.warn(`\n[features] ${warnings.join(" ")}`);
 }
 
@@ -72,12 +107,28 @@ export function getFeatureFlags() {
   const hasAnyCaptchaInput = !!(
     process.env.CAPTCHA_SECRET_KEY || process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY
   );
+  const captchaConfigured = !!(
+    process.env.CAPTCHA_SECRET_KEY && process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY
+  );
+  const captchaExplicitlyDisabled = process.env.DISABLE_CAPTCHA === "true";
+  const localhostAuth = isLocalhostAuthUrl(process.env.BETTER_AUTH_URL);
+  const captchaAllowedOnLocalhost =
+    process.env.ENABLE_CAPTCHA_ON_LOCALHOST === "true";
+  const captchaEnabled =
+    authEnabled &&
+    captchaConfigured &&
+    !captchaExplicitlyDisabled &&
+    (!localhostAuth || captchaAllowedOnLocalhost);
 
   warnForPartialConfig({
     authEnabled,
     hasAnyAuthInput,
     hasAnyStripeInput,
     hasAnyCaptchaInput,
+    captchaConfigured,
+    captchaEnabled,
+    localhostAuth,
+    captchaAllowedOnLocalhost,
   });
 
   return {
@@ -107,12 +158,7 @@ export function getFeatureFlags() {
       !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
 
     /** Cloudflare Turnstile bot protection (requires auth + both server secret + client site key) */
-    captcha:
-      authEnabled &&
-      !!(
-        process.env.CAPTCHA_SECRET_KEY &&
-        process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY
-      ),
+    captcha: captchaEnabled,
   };
 }
 

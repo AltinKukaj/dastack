@@ -89,7 +89,12 @@ function createAuth() {
       captcha({
         provider: "cloudflare-turnstile",
         secretKey: captchaSecret,
-        endpoints: ["/sign-in/magic-link", "/sign-in/social"],
+        endpoints: [
+          "/sign-in/email",
+          "/sign-up/email",
+          "/sign-in/passkey",
+          "/sign-in/magic-link",
+        ],
       }),
     );
   }

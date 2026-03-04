@@ -17,7 +17,9 @@ export function proxy(request: NextRequest) {
 
   if (!sessionCookie) {
     const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+    // Preserve query params for post-auth return navigation.
+    const callbackPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    signInUrl.searchParams.set("callbackUrl", callbackPath);
     return NextResponse.redirect(signInUrl);
   }
 

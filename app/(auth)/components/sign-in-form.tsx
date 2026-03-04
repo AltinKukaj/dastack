@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import { authClient, signIn } from "@/lib/auth-client";
+import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
 import { TurnstileWidget } from "./turnstile-widget";
@@ -44,9 +45,22 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   const [totpCode, setTotpCode] = useState("");
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
 
+  const getPasskeyErrorMessage = (err: unknown): string => {
+    const message =
+      err instanceof Error ? err.message : "Passkey sign-in failed.";
+    const normalized = message.toLowerCase();
+    if (
+      normalized.includes("p2021") ||
+      normalized.includes("public.passkey") ||
+      normalized.includes("passkey")
+    ) {
+      return "Passkey data is unavailable in this database. Run `bun db:push` to create missing tables or set DISABLE_PASSKEY=true in .env.";
+    }
+    return message;
+  };
+
   useEffect(() => {
-    fetch("/api/features")
-      .then((r) => r.json())
+    getClientFeatureFlags()
       .then((data) =>
         setConfig({
           emailEnabled: data.email ?? false,
@@ -69,6 +83,8 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   useEffect(() => {
     if (!config?.passkeyEnabled) return;
+    if (config.captchaEnabled) return;
+    if (process.env.NODE_ENV !== "production") return;
     if (typeof window === "undefined") return;
     if (!("PublicKeyCredential" in window)) return;
 
@@ -95,7 +111,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
       .catch(() => {
         // Browser does not support passkey conditional UI.
       });
-  }, [callbackURL, config?.passkeyEnabled]);
+  }, [callbackURL, config?.captchaEnabled, config?.passkeyEnabled]);
 
   const getCaptchaHeaders = (): Record<string, string> => {
     if (config?.captchaEnabled && captchaToken) {
@@ -115,6 +131,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   const handlePasswordSignIn = async () => {
     if (!email.trim() || !password) return;
+    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading("password");
 
@@ -200,11 +217,14 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   };
 
   const handlePasskey = async () => {
+    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading("passkey");
     try {
+      const headers = getCaptchaHeaders();
       const result = await authClient.signIn.passkey({
         fetchOptions: {
+          ...(Object.keys(headers).length > 0 ? { headers } : {}),
           onSuccess: () => {
             window.location.href = callbackURL;
           },
@@ -213,14 +233,13 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
       if (result.error)
         throw new Error(result.error.message ?? "Passkey sign-in failed.");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Passkey sign-in failed.");
+      setError(getPasskeyErrorMessage(err));
     } finally {
       setLoading(null);
     }
   };
 
   const handleSocial = async (provider: SocialProvider) => {
-    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading(provider);
     try {
@@ -231,7 +250,15 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
         fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
       });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      if (message.toLowerCase().includes("403")) {
+        setError(
+          "Social sign-in was blocked. If captcha or privacy blocking is enabled, try password/magic link or disable strict content blocking and try again.",
+        );
+      } else {
+        setError(message);
+      }
       setLoading(null);
     }
   };
@@ -528,7 +555,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           onUnavailable={() => {
             setCaptchaToken(null);
             setError(
-              "Captcha failed to load. Allow challenges.cloudflare.com (or disable extension blocking) and refresh.",
+              "Captcha failed to load. Allow challenges.cloudflare.com, verify your Turnstile widget allows this domain (localhost in dev), or disable strict extension blocking and refresh.",
             );
           }}
         />

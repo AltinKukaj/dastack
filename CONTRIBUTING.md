@@ -13,9 +13,16 @@ Thanks for your interest in improving this template.
 
 ```bash
 bun install
+bun run check
+```
+
+If you need to run checks individually:
+
+```bash
 bun run lint
 bun run type-check
 bun test
+bun run build
 ```
 
 If your change touches database behavior:

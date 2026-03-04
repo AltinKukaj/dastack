@@ -10,11 +10,15 @@ An opinionated, production-ready Next.js template starter. Clone it, wire up you
 
 | I want to… | Go to |
 |------------|--------|
+| Validate local requirements first | [DOCS/prerequisites.md](./DOCS/prerequisites.md) |
 | Get running | [DOCS/database.md](./DOCS/database.md) -> [DOCS/env.md](./DOCS/env.md) |
+| Validate first-time setup quickly | [DOCS/onboarding.md](./DOCS/onboarding.md) |
+| Understand architecture quickly | [DOCS/architecture.md](./DOCS/architecture.md) |
 | Set up auth & OAuth | [DOCS/auth.md](./DOCS/auth.md) -> [DOCS/oauth.md](./DOCS/oauth.md) |
 | Add Stripe | [DOCS/stripe.md](./DOCS/stripe.md) |
 | Customize branding/placeholders | [DOCS/customization.md](./DOCS/customization.md) |
 | Deploy (Docker + Dokploy default) | [DOCS/deploying.md](./DOCS/deploying.md) |
+| Follow production deploy runbook | [DOCS/deployment-runbook.md](./DOCS/deployment-runbook.md) |
 | Fix common setup/runtime issues | [DOCS/troubleshooting.md](./DOCS/troubleshooting.md) |
 | Explore optional integrations | [DOCS/optional.md](./DOCS/optional.md) |
 | Find a file or command | [DOCS/codebase.md](./DOCS/codebase.md) |

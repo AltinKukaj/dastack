@@ -106,10 +106,11 @@ Use this when you’re looking for a feature and don’t know which file to open
 | `bun db:migrate:dev` | Create and apply a migration |
 | `bun db:migrate:deploy` | Apply migrations (e.g. production) |
 | `bun db:studio` | Open Prisma Studio |
-| `bun stripe:sync` | Push `lib/plans.ts` to Stripe, update `lib/auth.ts` |
+| `bun stripe:sync` | Push `lib/plans.ts` to Stripe, regenerate `lib/stripe-plans.generated.ts` |
 | `bun stripe:poll` | Poll Stripe for completed checkouts (local dev) |
+| `bun run check` | Run lint + type-check + tests + production build |
 | `bun lint`, `bun type-check` | Lint and TypeScript check |
-| `bun test` | Run tests in `__tests__/` (Bun; env schema + Prisma config smoke tests) |
+| `bun test` | Run tests in `__tests__/` (Bun; env, feature flags, permissions, and tRPC example coverage) |
 
 ---
 
@@ -118,7 +119,7 @@ Use this when you’re looking for a feature and don’t know which file to open
 | What | Where |
 |------|--------|
 | Test runner | **Bun** (`bun test`) |
-| Test files | `__tests__/` (e.g. `__tests__/smoke.test.ts`) |
-| What’s covered | Env schema validation (Zod), Prisma config import - no DB or real env required |
+| Test files | `__tests__/smoke.test.ts`, `__tests__/features.test.ts`, `__tests__/permissions.test.ts`, `__tests__/trpc-example.test.ts` |
+| What’s covered | Env schema behavior, Prisma config import, feature flags, RBAC helpers, and example tRPC procedure shape |
 
 The default smoke tests check that the same Zod patterns used in `lib/env.ts` accept/reject values correctly, and that `prisma.config.ts` can be loaded. You can add more tests in `__tests__/` and run them with `bun test`.

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { getClientFeatureFlags } from "@/lib/feature-flags-client";
+import { getSafeCallbackUrl } from "@/lib/safe-callback-url";
 import { SignInForm } from "../components/sign-in-form";
 import { SignUpForm } from "../components/sign-up-form";
 
@@ -25,7 +27,10 @@ export default function AuthPage() {
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackURL = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackURL = getSafeCallbackUrl(
+    searchParams.get("callbackUrl"),
+    "/dashboard",
+  );
   const initialTab =
     searchParams.get("tab") === "sign-up" ? "sign-up" : "sign-in";
 
@@ -33,8 +38,7 @@ function AuthContent() {
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetch("/api/features")
-      .then((r) => r.json())
+    getClientFeatureFlags()
       .then((data) => {
         if (!data.auth) {
           router.replace("/");

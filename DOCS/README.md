@@ -15,12 +15,16 @@
 
 | If you want to… | Read this |
 |-----------------|-----------|
+| **Confirm local requirements first** | [Prerequisites](./prerequisites.md) |
+| **Get a deterministic first-run validation** | [Onboarding checklist](./onboarding.md) |
 | **Get the app running** | [Database](./database.md) -> [Environment variables](./env.md) |
+| **Understand system design and boundaries** | [Architecture](./architecture.md) |
 | **Set up sign-in (magic link, Discord, Google, GitHub)** | [Auth](./auth.md) + [OAuth setup](./oauth.md) |
 | **Add payments** | [Stripe](./stripe.md) |
 | **Customize this template for your brand** | [Customization checklist](./customization.md) |
 | **Change branding, add UI components** | [UI & styling](./ui.md) |
 | **Deploy to production** | [Deploying](./deploying.md) |
+| **Use an operations deploy checklist** | [Deployment runbook](./deployment-runbook.md) |
 | **Fix common setup/runtime issues** | [Troubleshooting](./troubleshooting.md) |
 | **Disable or customize template options (passkeys, RBAC, Stripe)** | [Optional integrations](./optional.md#template-included-optional-features) |
 | **Explore add-on integrations (analytics, monitoring, i18n)** | [Optional integrations](./optional.md) |
@@ -31,17 +35,21 @@
 
 ## Recommended order (first time)
 
-1. **[database.md](./database.md)** - Get Postgres (local or hosted), then run `db:generate` and `db:push`.
-2. **[env.md](./env.md)** - Create `.env`, add the three core variables, then add any optional ones (email, OAuth, Stripe).
-3. **[auth.md](./auth.md)** - How auth works, routes, feature flags, and key files.
-4. **[oauth.md](./oauth.md)** - Step-by-step: Discord, Google, GitHub redirect URLs (so you don’t get “redirect_uri mismatch”).
-5. **[stripe.md](./stripe.md)** - Stripe keys, local dev with `bun stripe:poll`, webhooks, and plans.
-6. **[customization.md](./customization.md)** - Replace template branding, links, and placeholder copy.
-7. **[ui.md](./ui.md)** - Tailwind, branding, sitemap, and optional component libraries.
-8. **[deploying.md](./deploying.md)** - Docker, Vercel, Railway, health checks, and the GitHub Actions -> Dokploy workflow.
-9. **[troubleshooting.md](./troubleshooting.md)** - Fast answers for startup/env/OAuth/Stripe issues.
-10. **[optional.md](./optional.md)** - Monitoring, analytics, and i18n integration options.
-11. **[testing.md](./testing.md)** - What template tests cover and what to add next.
+1. **[prerequisites.md](./prerequisites.md)** - Confirm supported runtime, database, and account requirements.
+2. **[database.md](./database.md)** - Get Postgres (local or hosted), then run `db:generate` and `db:push`.
+3. **[env.md](./env.md)** - Create `.env`, add the three core variables, then add any optional ones (email, OAuth, Stripe).
+4. **[onboarding.md](./onboarding.md)** - Run the first 30-minute validation flow and mode checks.
+5. **[architecture.md](./architecture.md)** - Understand request flow, auth boundaries, and extension points.
+6. **[auth.md](./auth.md)** - How auth works, routes, feature flags, and key files.
+7. **[oauth.md](./oauth.md)** - Step-by-step: Discord, Google, GitHub redirect URLs (so you don’t get “redirect_uri mismatch”).
+8. **[stripe.md](./stripe.md)** - Stripe keys, local dev with `bun stripe:poll`, webhooks, and plans.
+9. **[customization.md](./customization.md)** - Replace template branding, links, and placeholder copy.
+10. **[ui.md](./ui.md)** - Tailwind, branding, sitemap, and optional component libraries.
+11. **[deploying.md](./deploying.md)** - Docker, Vercel, Railway, health checks, and the GitHub Actions -> Dokploy workflow.
+12. **[deployment-runbook.md](./deployment-runbook.md)** - Production rollout, smoke checks, rollback, and incident actions.
+13. **[troubleshooting.md](./troubleshooting.md)** - Fast answers for startup/env/OAuth/Stripe issues.
+14. **[optional.md](./optional.md)** - Monitoring, analytics, and i18n integration options.
+15. **[testing.md](./testing.md)** - What template tests cover and what to add next.
 
 ---
 

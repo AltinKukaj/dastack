@@ -53,7 +53,7 @@ Update these placeholders:
 
 - Plan names, prices, features, limits: `lib/plans.ts`
 - Pricing page messaging and CTA wording: `app/pricing/page.tsx`
-- Stripe IDs used by auth: `lib/auth.ts` (or regenerate via `bun stripe:sync`)
+- Stripe IDs used by auth: `lib/stripe-plans.generated.ts` (regenerated via `bun stripe:sync`, then consumed by `lib/auth.ts`)
 
 After editing plan values in `lib/plans.ts`, run:
 

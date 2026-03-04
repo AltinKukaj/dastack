@@ -148,6 +148,21 @@ CAPTCHA_SECRET_KEY=...
 NEXT_PUBLIC_CAPTCHA_SITE_KEY=...
 ```
 
+Local development defaults:
+
+- Captcha is **off by default on localhost** (to avoid Turnstile domain mismatch issues).
+- To test captcha locally, add localhost to your Turnstile widget allowlist and set:
+
+```env
+ENABLE_CAPTCHA_ON_LOCALHOST=true
+```
+
+Optional hard override (any environment):
+
+```env
+DISABLE_CAPTCHA=true
+```
+
 ---
 
 ## 4. “Why is my app crashing on startup?”
@@ -201,3 +216,5 @@ If startup fails, OAuth callbacks mismatch, emails fail, or Stripe appears stuck
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Optional | Stripe client checkout flows |
 | `CAPTCHA_SECRET_KEY` | Optional | Turnstile server verification |
 | `NEXT_PUBLIC_CAPTCHA_SITE_KEY` | Optional | Turnstile widget on auth forms |
+| `ENABLE_CAPTCHA_ON_LOCALHOST` | Optional | Set `true` to allow captcha enforcement on localhost for local Turnstile testing |
+| `DISABLE_CAPTCHA` | Optional | Set `true` to force-disable captcha even when keys are present |

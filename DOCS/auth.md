@@ -50,6 +50,9 @@ Turn these on by adding the right variables. The UI shows or hides options autom
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
 | Captcha (Turnstile) | `CAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_CAPTCHA_SITE_KEY` |
 
+When captcha is enabled, auth requires a valid token for email/password sign-in, email sign-up, magic-link sign-in, and passkey sign-in.
+On localhost, captcha is disabled by default unless `ENABLE_CAPTCHA_ON_LOCALHOST=true`.
+
 **OAuth callback URL** (when registering your app with Discord/Google/GitHub):
 
 ```
@@ -81,6 +84,8 @@ All optional features require `auth` to be `true`. The UI reads these flags and 
 | `/sign-in`, `/sign-up` | Redirect to `/auth` |
 | `/forgot-password`, `/reset-password?token=...` | Password reset |
 | `/dashboard/*` | Protected - no session -> redirect to sign-in, then `/auth` |
+
+`callbackUrl` is sanitized to local relative paths (must start with `/`) to prevent open redirects.
 
 **How protection works**
 

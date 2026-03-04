@@ -85,3 +85,31 @@ If `/dashboard` redirects away or appears blocked:
 - Optional feature flags (like Stripe) may hide billing sections if not configured.
 
 Related docs: [auth.md](./auth.md), [env.md](./env.md)
+
+---
+
+## Passkey errors (`P2021` / `public.passkey` does not exist)
+
+If you see errors like:
+
+- `The table public.passkey does not exist`
+- Prisma error code `P2021`
+
+your database schema is behind the current auth plugin config.
+
+**Fix options:**
+
+1. Apply schema updates:
+
+```bash
+bun db:generate
+bun db:push
+```
+
+2. Or disable passkeys if you do not need them:
+
+```env
+DISABLE_PASSKEY=true
+```
+
+Then restart `bun dev`.

@@ -1,18 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut, useSession } from "@/lib/auth-client";
+import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { useAppStore } from "@/lib/store";
 import { trpc } from "@/lib/trpc";
-
-const navItems = [
-  { label: "Overview", href: "/dashboard" },
-  { label: "Billing", href: "/dashboard/billing" },
-  { label: "Settings", href: "/dashboard/settings" },
-];
+import { DashboardShell } from "./components/dashboard-shell";
 
 const quickActions = [
   {
@@ -44,7 +39,6 @@ const setupSteps = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const { data: session, isPending } = useSession();
   const [stripeEnabled, setStripeEnabled] = useState(false);
 
@@ -57,8 +51,7 @@ export default function DashboardPage() {
   );
 
   useEffect(() => {
-    fetch("/api/features")
-      .then((r) => r.json())
+    getClientFeatureFlags()
       .then((data) => setStripeEnabled(data.stripe ?? false))
       .catch(() => {});
   }, []);
@@ -94,266 +87,174 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#09090b] font-[family-name:var(--font-geist-sans)] text-white">
-      <aside className="hidden w-48 shrink-0 border-r border-neutral-800/40 lg:flex lg:flex-col">
-        <div className="px-5 py-5">
-          <Link
-            href="/"
-            className="font-[family-name:var(--font-geist-mono)] text-[13px] tracking-tight text-white"
+    <DashboardShell
+      sectionLabel="Overview"
+      stripeEnabled={stripeEnabled}
+      user={{
+        image: session?.user.image,
+        name: session?.user.name,
+        email: session?.user.email,
+      }}
+      headerActions={
+        <>
+          <button
+            type="button"
+            onClick={toggleCommand}
+            className={`rounded-lg border px-3 py-1.5 text-xs transition ${
+              commandOpen
+                ? "border-neutral-600 bg-neutral-800 text-white"
+                : "border-neutral-800/60 text-neutral-600 hover:text-white"
+            }`}
           >
-            dastack
-          </Link>
-        </div>
+            {commandOpen ? "Command: ON" : "Command: OFF"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="rounded-lg border border-neutral-800/60 px-3 py-1.5 text-xs text-neutral-600 transition hover:text-white"
+          >
+            Sign out
+          </button>
+        </>
+      }
+    >
+      <main className="flex-1 overflow-y-auto px-6 py-8">
+        <div className="animate-fade-in mx-auto max-w-4xl">
+          <h1 className="font-[family-name:var(--font-geist-mono)] text-2xl tracking-tight">
+            Welcome back{firstName ? `, ${firstName}` : ""}.
+          </h1>
+          <p className="mt-2 text-sm text-neutral-600">
+            Your current metrics and next steps.
+          </p>
 
-        <nav className="flex-1 px-2 py-2">
-          <ul className="space-y-0.5">
-            {navItems
-              .filter(
-                (item) => item.href !== "/dashboard/billing" || stripeEnabled,
-              )
-              .map((item) => {
-                const active = pathname === item.href;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={`block py-2 text-[13px] transition-colors ${
-                        active
-                          ? "border-l-2 border-white pl-[14px] font-medium text-white"
-                          : "pl-4 text-neutral-600 hover:text-neutral-300"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-          </ul>
-        </nav>
-
-        <div className="border-t border-neutral-800/40 p-3">
-          <div className="flex items-center gap-2.5 px-2 py-1">
-            <UserAvatar
-              image={session?.user.image}
-              name={session?.user.name}
-              email={session?.user.email}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-white">
-                {displayName}
-              </p>
-              <p className="truncate text-[10px] text-neutral-700">
-                {session?.user.email}
-              </p>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <div className="flex flex-1 flex-col">
-        <header className="border-b border-neutral-800/40">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="font-[family-name:var(--font-geist-mono)] text-[13px] lg:hidden"
+          <div className="mt-8 divide-y divide-neutral-800/40">
+            {stats.map((stat, i) => (
+              <div
+                key={stat.label}
+                className="animate-slide-up flex items-baseline justify-between py-3.5"
+                style={{ animationDelay: `${150 + i * 70}ms` }}
               >
-                dastack
-              </Link>
-              <span className="hidden text-[13px] text-neutral-600 lg:block">
-                Overview
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={toggleCommand}
-                className={`rounded-lg border px-3 py-1.5 text-xs transition ${
-                  commandOpen
-                    ? "border-neutral-600 bg-neutral-800 text-white"
-                    : "border-neutral-800/60 text-neutral-600 hover:text-white"
-                }`}
-              >
-                {commandOpen ? "Command: ON" : "Command: OFF"}
-              </button>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="rounded-lg border border-neutral-800/60 px-3 py-1.5 text-xs text-neutral-600 transition hover:text-white"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto px-6 py-8">
-          <div className="animate-fade-in mx-auto max-w-4xl">
-            <h1 className="font-[family-name:var(--font-geist-mono)] text-2xl tracking-tight">
-              Welcome back{firstName ? `, ${firstName}` : ""}.
-            </h1>
-            <p className="mt-2 text-sm text-neutral-600">
-              Your current metrics and next steps.
-            </p>
-
-            <div className="mt-8 divide-y divide-neutral-800/40">
-              {stats.map((stat, i) => (
-                <div
-                  key={stat.label}
-                  className="animate-slide-up flex items-baseline justify-between py-3.5"
-                  style={{ animationDelay: `${150 + i * 70}ms` }}
-                >
-                  <span className="text-sm text-neutral-500">{stat.label}</span>
-                  <div className="flex items-baseline gap-4">
-                    <span className="font-[family-name:var(--font-geist-mono)] text-sm text-white">
-                      {stat.value}
-                    </span>
-                    <span className="text-[11px] text-neutral-700">
-                      {stat.note}
-                    </span>
-                  </div>
+                <span className="text-sm text-neutral-500">{stat.label}</span>
+                <div className="flex items-baseline gap-4">
+                  <span className="font-[family-name:var(--font-geist-mono)] text-sm text-white">
+                    {stat.value}
+                  </span>
+                  <span className="text-[11px] text-neutral-700">
+                    {stat.note}
+                  </span>
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-10 grid gap-10 xl:grid-cols-2">
-              <section>
-                <h2 className="text-[13px] font-medium text-neutral-400">
-                  Next moves
-                </h2>
-                <div className="mt-4 space-y-0 divide-y divide-neutral-800/40">
-                  {quickActions
-                    .filter(
-                      (a) => a.href !== "/dashboard/billing" || stripeEnabled,
-                    )
-                    .map((action, i) => {
-                      const inner = (
-                        <>
-                          <p className="text-sm text-white transition-transform group-hover:translate-x-1">
-                            {action.label}
-                          </p>
-                          <p className="mt-0.5 text-[12px] text-neutral-700">
-                            {action.description}
-                          </p>
-                        </>
-                      );
-                      return action.external ? (
-                        <a
-                          key={action.label}
-                          href={action.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group block py-3.5 animate-slide-up"
-                          style={{ animationDelay: `${500 + i * 80}ms` }}
-                        >
-                          {inner}
-                        </a>
-                      ) : (
-                        <Link
-                          key={action.label}
-                          href={action.href}
-                          className="group block py-3.5 animate-slide-up"
-                          style={{ animationDelay: `${500 + i * 80}ms` }}
-                        >
-                          {inner}
-                        </Link>
-                      );
-                    })}
-                </div>
-              </section>
-
-              <section>
-                <h2 className="text-[13px] font-medium text-neutral-400">
-                  Checklist
-                </h2>
-                <div className="mt-4 space-y-0 divide-y divide-neutral-800/40">
-                  {setupSteps
-                    .filter(
-                      (step) =>
-                        stripeEnabled ||
-                        !step.label.toLowerCase().includes("stripe"),
-                    )
-                    .map((step, index) => (
-                      <div
-                        key={step.label}
-                        className="flex items-center gap-3 py-3 animate-slide-up"
-                        style={{ animationDelay: `${600 + index * 60}ms` }}
-                      >
-                        <span
-                          className={`flex size-5 shrink-0 items-center justify-center rounded font-[family-name:var(--font-geist-mono)] text-[10px] ${
-                            step.done
-                              ? "bg-white text-black"
-                              : "border border-neutral-800 text-neutral-700"
-                          }`}
-                        >
-                          {step.done ? (
-                            <svg
-                              viewBox="0 0 16 16"
-                              fill="currentColor"
-                              className="size-3"
-                              aria-hidden="true"
-                            >
-                              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
-                            </svg>
-                          ) : (
-                            index + 1
-                          )}
-                        </span>
-                        <span
-                          className={`text-sm ${step.done ? "text-neutral-500" : "text-white"}`}
-                        >
-                          {step.label}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </section>
-            </div>
-
-            {commandOpen && (
-              <div className="animate-fade-in mt-8 border-l-2 border-neutral-600 pl-4 py-3">
-                <p className="font-[family-name:var(--font-geist-mono)] text-xs text-neutral-400">
-                  Zustand State Active
-                </p>
-                <p className="mt-1.5 text-sm text-neutral-600">
-                  The command palette state is{" "}
-                  <span className="text-white">enabled</span>. Use this to
-                  trigger modals or flyouts from anywhere in the component tree.
-                </p>
               </div>
-            )}
+            ))}
           </div>
-        </main>
-      </div>
-    </div>
-  );
-}
 
-function UserAvatar({
-  image,
-  name,
-  email,
-}: {
-  image?: string | null;
-  name?: string | null;
-  email?: string | null;
-}) {
-  if (image) {
-    return (
-      <Image
-        src={image}
-        alt={name ?? "Avatar"}
-        width={28}
-        height={28}
-        className="rounded border border-neutral-800 object-cover"
-      />
-    );
-  }
+          <div className="mt-10 grid gap-10 xl:grid-cols-2">
+            <section>
+              <h2 className="text-[13px] font-medium text-neutral-400">
+                Next moves
+              </h2>
+              <div className="mt-4 space-y-0 divide-y divide-neutral-800/40">
+                {quickActions
+                  .filter(
+                    (a) => a.href !== "/dashboard/billing" || stripeEnabled,
+                  )
+                  .map((action, i) => {
+                    const inner = (
+                      <>
+                        <p className="text-sm text-white transition-transform group-hover:translate-x-1">
+                          {action.label}
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-neutral-700">
+                          {action.description}
+                        </p>
+                      </>
+                    );
+                    return action.external ? (
+                      <a
+                        key={action.label}
+                        href={action.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group block py-3.5 animate-slide-up"
+                        style={{ animationDelay: `${500 + i * 80}ms` }}
+                      >
+                        {inner}
+                      </a>
+                    ) : (
+                      <Link
+                        key={action.label}
+                        href={action.href}
+                        className="group block py-3.5 animate-slide-up"
+                        style={{ animationDelay: `${500 + i * 80}ms` }}
+                      >
+                        {inner}
+                      </Link>
+                    );
+                  })}
+              </div>
+            </section>
 
-  return (
-    <div className="flex size-7 items-center justify-center rounded border border-neutral-800 font-[family-name:var(--font-geist-mono)] text-[10px] text-neutral-500">
-      {(name?.[0] ?? email?.[0] ?? "?").toUpperCase()}
-    </div>
+            <section>
+              <h2 className="text-[13px] font-medium text-neutral-400">
+                Checklist
+              </h2>
+              <div className="mt-4 space-y-0 divide-y divide-neutral-800/40">
+                {setupSteps
+                  .filter(
+                    (step) =>
+                      stripeEnabled ||
+                      !step.label.toLowerCase().includes("stripe"),
+                  )
+                  .map((step, index) => (
+                    <div
+                      key={step.label}
+                      className="flex items-center gap-3 py-3 animate-slide-up"
+                      style={{ animationDelay: `${600 + index * 60}ms` }}
+                    >
+                      <span
+                        className={`flex size-5 shrink-0 items-center justify-center rounded font-[family-name:var(--font-geist-mono)] text-[10px] ${
+                          step.done
+                            ? "bg-white text-black"
+                            : "border border-neutral-800 text-neutral-700"
+                        }`}
+                      >
+                        {step.done ? (
+                          <svg
+                            viewBox="0 0 16 16"
+                            fill="currentColor"
+                            className="size-3"
+                            aria-hidden="true"
+                          >
+                            <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                          </svg>
+                        ) : (
+                          index + 1
+                        )}
+                      </span>
+                      <span
+                        className={`text-sm ${step.done ? "text-neutral-500" : "text-white"}`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          </div>
+
+          {commandOpen && (
+            <div className="animate-fade-in mt-8 border-l-2 border-neutral-600 pl-4 py-3">
+              <p className="font-[family-name:var(--font-geist-mono)] text-xs text-neutral-400">
+                Zustand State Active
+              </p>
+              <p className="mt-1.5 text-sm text-neutral-600">
+                The command palette state is{" "}
+                <span className="text-white">enabled</span>. Use this to trigger
+                modals or flyouts from anywhere in the component tree.
+              </p>
+            </div>
+          )}
+        </div>
+      </main>
+    </DashboardShell>
   );
 }

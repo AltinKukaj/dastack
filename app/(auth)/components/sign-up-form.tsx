@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
+import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
 import { TurnstileWidget } from "./turnstile-widget";
@@ -39,8 +40,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/features")
-      .then((r) => r.json())
+    getClientFeatureFlags()
       .then((data) =>
         setConfig({
           emailEnabled: data.email ?? false,
@@ -77,6 +77,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
 
   const handleEmailSignUp = async () => {
     if (!name.trim() || !email.trim() || !password) return;
+    if (!ensureCaptchaIfRequired()) return;
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -92,12 +93,14 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
     setLoading("email");
 
     try {
+      const headers = getCaptchaHeaders();
       const result = await signUp.email({
         name: name.trim(),
         email: email.trim(),
         password,
         ...(username.trim() ? { username: username.trim() } : {}),
         callbackURL,
+        fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
       });
 
       if (result.error) {
@@ -117,7 +120,6 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   };
 
   const handleSocial = async (provider: SocialProvider) => {
-    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading(provider);
     try {
@@ -128,7 +130,15 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
         fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
       });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      if (message.toLowerCase().includes("403")) {
+        setError(
+          "Social sign-up was blocked. If captcha or privacy blocking is enabled, try email sign-up or disable strict content blocking and retry.",
+        );
+      } else {
+        setError(message);
+      }
       setLoading(null);
     }
   };
@@ -331,7 +341,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
           onUnavailable={() => {
             setCaptchaToken(null);
             setError(
-              "Captcha failed to load. Allow challenges.cloudflare.com (or disable extension blocking) and refresh.",
+              "Captcha failed to load. Allow challenges.cloudflare.com, verify your Turnstile widget allows this domain (localhost in dev), or disable strict extension blocking and refresh.",
             );
           }}
         />

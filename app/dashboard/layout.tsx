@@ -26,7 +26,7 @@ export default async function DashboardLayout({
   });
 
   if (!session) {
-    redirect("/auth");
+    redirect("/auth?callbackUrl=/dashboard");
   }
 
   return <>{children}</>;
