@@ -100,14 +100,20 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     if (!config?.captchaEnabled) return;
     const siteKey = config.captchaSiteKey;
     if (!siteKey) return;
-    if (document.getElementById("turnstile-script")) return;
-    const script = document.createElement("script");
-    script.id = "turnstile-script";
-    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-    script.async = true;
-    document.head.appendChild(script);
     const handler = (e: Event) => setCaptchaToken((e as CustomEvent).detail);
     window.addEventListener("captcha-solved", handler);
+    const existingToken = (window as Window & { __captchaToken?: string })
+      .__captchaToken;
+    if (existingToken) {
+      setCaptchaToken(existingToken);
+    }
+    if (!document.getElementById("turnstile-script")) {
+      const script = document.createElement("script");
+      script.id = "turnstile-script";
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+      script.async = true;
+      document.head.appendChild(script);
+    }
     return () => window.removeEventListener("captcha-solved", handler);
   }, [config?.captchaEnabled, config?.captchaSiteKey]);
 
