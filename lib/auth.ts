@@ -23,13 +23,21 @@ const features = getFeatureFlags();
 function createAuth() {
   if (!features.auth || !prisma) return null;
 
-  const authUrl = new URL(env.BETTER_AUTH_URL!);
+  const authUrlRaw = env.BETTER_AUTH_URL;
+  if (!authUrlRaw) return null;
+  const authUrl = new URL(authUrlRaw);
   const plugins = [];
 
   if (features.email) {
     plugins.push(
       magicLink({
-        sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
+        sendMagicLink: async ({
+          email,
+          url,
+        }: {
+          email: string;
+          url: string;
+        }) => {
           const { sendMagicLinkEmail } = await import("./email");
           await sendMagicLinkEmail({ email, url });
         },
@@ -56,14 +64,18 @@ function createAuth() {
   plugins.push(i18n({ defaultLocale: "en", translations: { en: {} } }));
 
   if (features.stripe) {
-    plugins.push(
-      stripe({
-        stripeClient: new Stripe(env.STRIPE_SECRET_KEY!),
-        stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET!,
-        createCustomerOnSignUp: false,
-        subscription: { enabled: true, plans: stripePlans },
-      }),
-    );
+    const stripeSecret = env.STRIPE_SECRET_KEY;
+    const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
+    if (stripeSecret && webhookSecret) {
+      plugins.push(
+        stripe({
+          stripeClient: new Stripe(stripeSecret),
+          stripeWebhookSecret: webhookSecret,
+          createCustomerOnSignUp: false,
+          subscription: { enabled: true, plans: stripePlans },
+        }),
+      );
+    }
   }
 
   return betterAuth({
@@ -75,7 +87,13 @@ function createAuth() {
       requireEmailVerification: false,
       ...(features.email
         ? {
-            sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
+            sendResetPassword: async ({
+              user,
+              url,
+            }: {
+              user: { email: string };
+              url: string;
+            }) => {
               const { sendPasswordResetEmail } = await import("./email");
               await sendPasswordResetEmail({ email: user.email, url });
             },
@@ -88,7 +106,13 @@ function createAuth() {
           emailVerification: {
             sendOnSignUp: false,
             autoSignInAfterVerification: true,
-            sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
+            sendVerificationEmail: async ({
+              user,
+              url,
+            }: {
+              user: { email: string };
+              url: string;
+            }) => {
               const { sendVerificationEmail } = await import("./email");
               await sendVerificationEmail({ email: user.email, url });
             },
@@ -98,13 +122,29 @@ function createAuth() {
 
     socialProviders: {
       ...(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET
-        ? { discord: { clientId: env.DISCORD_CLIENT_ID, clientSecret: env.DISCORD_CLIENT_SECRET, prompt: "consent" } }
+        ? {
+            discord: {
+              clientId: env.DISCORD_CLIENT_ID,
+              clientSecret: env.DISCORD_CLIENT_SECRET,
+              prompt: "consent",
+            },
+          }
         : {}),
       ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+        ? {
+            google: {
+              clientId: env.GOOGLE_CLIENT_ID,
+              clientSecret: env.GOOGLE_CLIENT_SECRET,
+            },
+          }
         : {}),
       ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
-        ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
+        ? {
+            github: {
+              clientId: env.GITHUB_CLIENT_ID,
+              clientSecret: env.GITHUB_CLIENT_SECRET,
+            },
+          }
         : {}),
     },
 

@@ -12,7 +12,11 @@ type AuthTab = "sign-in" | "sign-up";
 
 function getOauthErrorMessage(code: string | null): string | null {
   if (!code) return null;
-  if (code === "please_restart_the_process" || code === "state_not_found" || code === "state_mismatch") {
+  if (
+    code === "please_restart_the_process" ||
+    code === "state_not_found" ||
+    code === "state_mismatch"
+  ) {
     return "Your social login session expired. Please try again.";
   }
   return `Social sign-in failed (${code.replace(/_/g, " ")}). Please try again.`;
@@ -35,9 +39,15 @@ export default function AuthPage() {
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackURL = getSafeCallbackUrl(searchParams.get("callbackUrl"), "/dashboard");
-  const oauthError = getOauthErrorMessage(searchParams.get("oauthError") ?? searchParams.get("error"));
-  const initialTab = searchParams.get("tab") === "sign-up" ? "sign-up" : "sign-in";
+  const callbackURL = getSafeCallbackUrl(
+    searchParams.get("callbackUrl"),
+    "/dashboard",
+  );
+  const oauthError = getOauthErrorMessage(
+    searchParams.get("oauthError") ?? searchParams.get("error"),
+  );
+  const initialTab =
+    searchParams.get("tab") === "sign-up" ? "sign-up" : "sign-in";
 
   const [activeTab, setActiveTab] = useState<AuthTab>(initialTab);
   const [ready, setReady] = useState(false);
@@ -63,7 +73,10 @@ function AuthContent() {
     <div className="flex min-h-screen items-center justify-center bg-[#09090b] px-4 font-[family-name:var(--font-geist-sans)]">
       <div className="w-full max-w-sm">
         <div className="animate-fade-in mb-10 text-center">
-          <Link href="/" className="font-[family-name:var(--font-geist-mono)] text-[13px] tracking-tight text-white">
+          <Link
+            href="/"
+            className="font-[family-name:var(--font-geist-mono)] text-[13px] tracking-tight text-white"
+          >
             dastack
           </Link>
         </div>

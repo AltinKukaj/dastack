@@ -15,10 +15,18 @@ export function getFeatureFlags() {
     auth: authEnabled,
     email: authEnabled && !!process.env.RESEND_API_KEY,
     passkey: authEnabled && process.env.DISABLE_PASSKEY !== "true",
-    discord: authEnabled && !!(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
-    google: authEnabled && !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    github: authEnabled && !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-    stripe: authEnabled && !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+    discord:
+      authEnabled &&
+      !!(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
+    google:
+      authEnabled &&
+      !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    github:
+      authEnabled &&
+      !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+    stripe:
+      authEnabled &&
+      !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
   };
 }
 

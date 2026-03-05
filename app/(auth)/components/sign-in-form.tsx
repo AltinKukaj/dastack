@@ -20,13 +20,14 @@ interface SignInFormProps {
   callbackURL: string;
 }
 
-
 export function SignInForm({ callbackURL }: SignInFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState<AuthMode>("password");
   const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState<"password" | "magic" | "passkey" | SocialProvider | null>(null);
+  const [loading, setLoading] = useState<
+    "password" | "magic" | "passkey" | SocialProvider | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AuthConfig | null>(null);
 
@@ -36,24 +37,50 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   useEffect(() => {
     getClientFeatureFlags()
-      .then((data) => setConfig({ emailEnabled: data.email, passkeyEnabled: data.passkey, providers: data.providers }))
-      .catch(() => setConfig({ emailEnabled: false, passkeyEnabled: false, providers: { discord: false, google: false, github: false } }));
+      .then((data) =>
+        setConfig({
+          emailEnabled: data.email,
+          passkeyEnabled: data.passkey,
+          providers: data.providers,
+        }),
+      )
+      .catch(() =>
+        setConfig({
+          emailEnabled: false,
+          passkeyEnabled: false,
+          providers: { discord: false, google: false, github: false },
+        }),
+      );
   }, []);
 
   useEffect(() => {
     if (!config?.passkeyEnabled) return;
-    if (typeof window === "undefined" || !window.isSecureContext || !("PublicKeyCredential" in window)) return;
+    if (
+      typeof window === "undefined" ||
+      !window.isSecureContext ||
+      !("PublicKeyCredential" in window)
+    )
+      return;
 
-    const pk = PublicKeyCredential as typeof PublicKeyCredential & { isConditionalMediationAvailable?: () => Promise<boolean> };
+    const pk = PublicKeyCredential as typeof PublicKeyCredential & {
+      isConditionalMediationAvailable?: () => Promise<boolean>;
+    };
     if (!pk.isConditionalMediationAvailable) return;
 
-    void pk.isConditionalMediationAvailable().then((ok) => {
-      if (!ok) return;
-      return authClient.signIn.passkey({
-        autoFill: true,
-        fetchOptions: { onSuccess: () => { window.location.href = callbackURL; } },
-      });
-    }).catch(() => {});
+    void pk
+      .isConditionalMediationAvailable()
+      .then((ok) => {
+        if (!ok) return;
+        return authClient.signIn.passkey({
+          autoFill: true,
+          fetchOptions: {
+            onSuccess: () => {
+              window.location.href = callbackURL;
+            },
+          },
+        });
+      })
+      .catch(() => {});
   }, [callbackURL, config?.passkeyEnabled]);
 
   const handlePasswordSignIn = async () => {
@@ -62,7 +89,11 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setLoading("password");
 
     try {
-      const result = await signIn.email({ email: email.trim(), password, callbackURL });
+      const result = await signIn.email({
+        email: email.trim(),
+        password,
+        callbackURL,
+      });
 
       if ((result.data as Record<string, unknown>)?.twoFactorRedirect) {
         setTwoFactorPending(true);
@@ -72,7 +103,11 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
       if (result.error) {
         const msg = result.error.message?.toLowerCase() ?? "";
-        if (msg.includes("two factor") || msg.includes("2fa") || msg.includes("totp")) {
+        if (
+          msg.includes("two factor") ||
+          msg.includes("2fa") ||
+          msg.includes("totp")
+        ) {
           setTwoFactorPending(true);
           setLoading(null);
           return;
@@ -94,8 +129,11 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setTwoFactorLoading(true);
 
     try {
-      const result = await authClient.twoFactor.verifyTotp({ code: totpCode.trim() });
-      if (result.error) throw new Error(result.error.message ?? "Invalid code.");
+      const result = await authClient.twoFactor.verifyTotp({
+        code: totpCode.trim(),
+      });
+      if (result.error)
+        throw new Error(result.error.message ?? "Invalid code.");
       window.location.href = callbackURL;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Invalid code.");
@@ -110,7 +148,10 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setLoading("magic");
 
     try {
-      const { error: magicError } = await signIn.magicLink({ email: email.trim(), callbackURL });
+      const { error: magicError } = await signIn.magicLink({
+        email: email.trim(),
+        callbackURL,
+      });
       if (magicError) throw new Error(magicError.message);
       setSent(true);
     } catch (err: unknown) {
@@ -126,9 +167,14 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
     try {
       const result = await authClient.signIn.passkey({
-        fetchOptions: { onSuccess: () => { window.location.href = callbackURL; } },
+        fetchOptions: {
+          onSuccess: () => {
+            window.location.href = callbackURL;
+          },
+        },
       });
-      if (result.error) throw new Error(result.error.message ?? "Passkey sign-in failed.");
+      if (result.error)
+        throw new Error(result.error.message ?? "Passkey sign-in failed.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Passkey sign-in failed.");
     } finally {
@@ -152,13 +198,19 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     }
   };
 
-  const socialButtons: { key: SocialProvider; icon: ReactNode; label: string }[] = [
+  const socialButtons: {
+    key: SocialProvider;
+    icon: ReactNode;
+    label: string;
+  }[] = [
     { key: "discord", icon: <DiscordIcon />, label: "Continue with Discord" },
     { key: "google", icon: <GoogleIcon />, label: "Continue with Google" },
     { key: "github", icon: <GitHubIcon />, label: "Continue with GitHub" },
   ];
 
-  const enabledSocials = config ? socialButtons.filter((b) => config.providers[b.key]) : [];
+  const enabledSocials = config
+    ? socialButtons.filter((b) => config.providers[b.key])
+    : [];
   const emailEnabled = config?.emailEnabled ?? false;
   const passkeyEnabled = config?.passkeyEnabled ?? false;
 
@@ -166,12 +218,21 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     return (
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="font-[family-name:var(--font-geist-mono)] text-lg text-white">Two-factor authentication</h2>
-          <p className="mt-1.5 text-sm text-neutral-500">Enter the 6-digit code from your authenticator app.</p>
+          <h2 className="font-[family-name:var(--font-geist-mono)] text-lg text-white">
+            Two-factor authentication
+          </h2>
+          <p className="mt-1.5 text-sm text-neutral-500">
+            Enter the 6-digit code from your authenticator app.
+          </p>
         </div>
 
         <div>
-          <label htmlFor="totp-code" className="mb-1.5 block text-xs text-neutral-600">Authentication code</label>
+          <label
+            htmlFor="totp-code"
+            className="mb-1.5 block text-xs text-neutral-600"
+          >
+            Authentication code
+          </label>
           <input
             id="totp-code"
             type="text"
@@ -192,14 +253,28 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           onClick={handleTwoFactorVerify}
           className="w-full rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {twoFactorLoading ? <span className="flex items-center justify-center gap-2"><Spinner dark /> Verifying...</span> : "Verify"}
+          {twoFactorLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner dark /> Verifying...
+            </span>
+          ) : (
+            "Verify"
+          )}
         </button>
 
-        {error && <p className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-2.5 text-center text-sm text-red-300">{error}</p>}
+        {error && (
+          <p className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-2.5 text-center text-sm text-red-300">
+            {error}
+          </p>
+        )}
 
         <button
           type="button"
-          onClick={() => { setTwoFactorPending(false); setTotpCode(""); setError(null); }}
+          onClick={() => {
+            setTwoFactorPending(false);
+            setTotpCode("");
+            setError(null);
+          }}
           className="text-center text-xs text-neutral-600 hover:text-white"
         >
           Use a different sign-in method
@@ -212,15 +287,38 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     return (
       <div className="flex flex-col items-center gap-4 py-6 text-center">
         <div className="flex size-12 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-6 text-white" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            className="size-6 text-white"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
+            />
           </svg>
         </div>
         <div>
-          <p className="font-[family-name:var(--font-geist-mono)] text-sm text-white">Check your inbox</p>
-          <p className="mt-1.5 text-sm text-neutral-400">We sent a sign-in link to <span className="text-neutral-200">{email}</span>.</p>
+          <p className="font-[family-name:var(--font-geist-mono)] text-sm text-white">
+            Check your inbox
+          </p>
+          <p className="mt-1.5 text-sm text-neutral-400">
+            We sent a sign-in link to{" "}
+            <span className="text-neutral-200">{email}</span>.
+          </p>
         </div>
-        <button type="button" onClick={() => { setSent(false); setEmail(""); }} className="rounded-lg border border-neutral-800 px-4 py-2 text-xs font-medium text-neutral-400 transition hover:border-neutral-700 hover:text-white">
+        <button
+          type="button"
+          onClick={() => {
+            setSent(false);
+            setEmail("");
+          }}
+          className="rounded-lg border border-neutral-800 px-4 py-2 text-xs font-medium text-neutral-400 transition hover:border-neutral-700 hover:text-white"
+        >
           Try another email
         </button>
       </div>
@@ -236,19 +334,42 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           onClick={handlePasskey}
           className="w-full rounded-lg border border-neutral-800 px-4 py-2.5 text-sm font-medium text-white transition hover:border-neutral-700 hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading === "passkey" ? <span className="flex items-center justify-center gap-2"><Spinner /> Waiting for passkey...</span> : "Sign in with passkey"}
+          {loading === "passkey" ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner /> Waiting for passkey...
+            </span>
+          ) : (
+            "Sign in with passkey"
+          )}
         </button>
       )}
 
       {emailEnabled && (
         <div className="flex rounded-lg border border-neutral-800 p-0.5">
-          <button type="button" onClick={() => setAuthMode("password")} className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${authMode === "password" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}>Password</button>
-          <button type="button" onClick={() => setAuthMode("magic")} className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${authMode === "magic" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}>Magic link</button>
+          <button
+            type="button"
+            onClick={() => setAuthMode("password")}
+            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${authMode === "password" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}
+          >
+            Password
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMode("magic")}
+            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${authMode === "magic" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}
+          >
+            Magic link
+          </button>
         </div>
       )}
 
       <div>
-        <label htmlFor="signin-email" className="mb-1.5 block text-xs text-neutral-600">Email</label>
+        <label
+          htmlFor="signin-email"
+          className="mb-1.5 block text-xs text-neutral-600"
+        >
+          Email
+        </label>
         <input
           id="signin-email"
           type="email"
@@ -256,7 +377,13 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { authMode === "password" ? handlePasswordSignIn() : handleMagicLink(); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              authMode === "password"
+                ? handlePasswordSignIn()
+                : handleMagicLink();
+            }
+          }}
           className="w-full rounded-lg border border-neutral-800 bg-transparent px-4 py-2.5 text-sm text-white placeholder:text-neutral-700 outline-none transition focus:border-neutral-600"
         />
       </div>
@@ -264,8 +391,18 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
       {authMode === "password" && (
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <label htmlFor="signin-password" className="text-xs text-neutral-600">Password</label>
-            <Link href="/forgot-password" className="text-xs text-neutral-600 hover:text-white">Forgot?</Link>
+            <label
+              htmlFor="signin-password"
+              className="text-xs text-neutral-600"
+            >
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-xs text-neutral-600 hover:text-white"
+            >
+              Forgot?
+            </Link>
           </div>
           <input
             id="signin-password"
@@ -287,7 +424,13 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           onClick={handlePasswordSignIn}
           className="w-full rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading === "password" ? <span className="flex items-center justify-center gap-2"><Spinner dark /> Signing in...</span> : "Sign in"}
+          {loading === "password" ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner dark /> Signing in...
+            </span>
+          ) : (
+            "Sign in"
+          )}
         </button>
       ) : (
         <>
@@ -297,14 +440,25 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
             onClick={handleMagicLink}
             className="w-full rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading === "magic" ? <span className="flex items-center justify-center gap-2"><Spinner dark /> Sending...</span> : "Send magic link"}
+            {loading === "magic" ? (
+              <span className="flex items-center justify-center gap-2">
+                <Spinner dark /> Sending...
+              </span>
+            ) : (
+              "Send magic link"
+            )}
           </button>
-          <p className="text-sm text-neutral-500">We&apos;ll email a sign-in link instead of asking for a password.</p>
+          <p className="text-sm text-neutral-500">
+            We&apos;ll email a sign-in link instead of asking for a password.
+          </p>
         </>
       )}
 
       {!emailEnabled && authMode === "password" && (
-        <p className="text-xs text-neutral-600">Magic link sign-in requires <code className="text-neutral-400">RESEND_API_KEY</code>.</p>
+        <p className="text-xs text-neutral-600">
+          Magic link sign-in requires{" "}
+          <code className="text-neutral-400">RESEND_API_KEY</code>.
+        </p>
       )}
 
       {enabledSocials.length > 0 && (
@@ -316,18 +470,34 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           </div>
           <div className="flex flex-col gap-2.5">
             {enabledSocials.map((b) => (
-              <SocialButton key={b.key} onClick={() => handleSocial(b.key)} loading={loading === b.key} icon={b.icon} label={b.label} />
+              <SocialButton
+                key={b.key}
+                onClick={() => handleSocial(b.key)}
+                loading={loading === b.key}
+                icon={b.icon}
+                label={b.label}
+              />
             ))}
           </div>
         </>
       )}
 
-      {error && <p className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-2.5 text-center text-sm text-red-300">{error}</p>}
+      {error && (
+        <p className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-2.5 text-center text-sm text-red-300">
+          {error}
+        </p>
+      )}
 
       <p className="text-center text-[11px] text-neutral-600">
         By continuing, you agree to our{" "}
-        <Link href="/terms" className="text-neutral-500 hover:text-white">Terms</Link>{" "}and{" "}
-        <Link href="/privacy" className="text-neutral-500 hover:text-white">Privacy Policy</Link>.
+        <Link href="/terms" className="text-neutral-500 hover:text-white">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="text-neutral-500 hover:text-white">
+          Privacy Policy
+        </Link>
+        .
       </p>
     </div>
   );
