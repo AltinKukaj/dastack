@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import { authClient, signIn } from "@/lib/auth-client";
+import { authDebugClient } from "@/lib/auth-debug-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
@@ -53,6 +54,14 @@ function getSocialStartUrl(
   return `/api/auth/sign-in/social?${params.toString()}`;
 }
 
+function maskEmail(email: string): string {
+  const value = email.trim();
+  const [local, domain] = value.split("@");
+  if (!local || !domain) return value;
+  if (local.length <= 2) return `${local[0] ?? "*"}*@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 export function SignInForm({ callbackURL }: SignInFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -83,21 +92,30 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   };
 
   useEffect(() => {
+    authDebugClient("sign_in.features.load.start", { callbackURL });
     getClientFeatureFlags()
-      .then((data) =>
+      .then((data) => {
+        authDebugClient("sign_in.features.load.success", {
+          callbackURL,
+          flags: data,
+        });
         setConfig({
           emailEnabled: data.email ?? false,
           passkeyEnabled: data.passkey ?? false,
           providers: data.providers,
-        }),
-      )
-      .catch(() =>
+        });
+      })
+      .catch((error) => {
+        authDebugClient("sign_in.features.load.error", {
+          callbackURL,
+          error: error instanceof Error ? error.message : String(error),
+        });
         setConfig({
           emailEnabled: false,
           passkeyEnabled: false,
           providers: { discord: false, google: false, github: false },
-        }),
-      );
+        });
+      });
   }, []);
 
   useEffect(() => {
@@ -133,12 +151,25 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     if (!email.trim() || !password) return;
     setError(null);
     setLoading("password");
+    authDebugClient("sign_in.password.start", {
+      email: maskEmail(email),
+      callbackURL,
+    });
 
     try {
       const result = await signIn.email({
         email: email.trim(),
         password,
         callbackURL,
+      });
+      authDebugClient("sign_in.password.result", {
+        email: maskEmail(email),
+        hasError: !!result.error,
+        error: result.error?.message ?? null,
+        hasData: !!result.data,
+        twoFactorRedirect: Boolean(
+          (result.data as Record<string, unknown>)?.twoFactorRedirect,
+        ),
       });
 
       if ((result.data as Record<string, unknown>)?.twoFactorRedirect) {
@@ -161,8 +192,13 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
         throw new Error(result.error.message ?? "Sign in failed.");
       }
 
+      authDebugClient("sign_in.password.success.redirect", { callbackURL });
       window.location.href = callbackURL;
     } catch (err: unknown) {
+      authDebugClient("sign_in.password.exception", {
+        email: maskEmail(email),
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(null);
@@ -195,15 +231,28 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     if (!email.trim()) return;
     setError(null);
     setLoading("magic");
+    authDebugClient("sign_in.magic_link.start", {
+      email: maskEmail(email),
+      callbackURL,
+    });
 
     try {
       const { error: magicLinkError } = await signIn.magicLink({
         email: email.trim(),
         callbackURL,
       });
+      authDebugClient("sign_in.magic_link.result", {
+        email: maskEmail(email),
+        hasError: !!magicLinkError,
+        error: magicLinkError?.message ?? null,
+      });
       if (magicLinkError) throw new Error(magicLinkError.message);
       setSent(true);
     } catch (err: unknown) {
+      authDebugClient("sign_in.magic_link.exception", {
+        email: maskEmail(email),
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(null);
@@ -213,6 +262,10 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   const handlePasskey = async () => {
     setError(null);
     setLoading("passkey");
+    authDebugClient("sign_in.passkey.start", {
+      callbackURL,
+      isSecureContext: window.isSecureContext,
+    });
     try {
       const result = await authClient.signIn.passkey({
         fetchOptions: {
@@ -221,9 +274,16 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           },
         },
       });
+      authDebugClient("sign_in.passkey.result", {
+        hasError: !!result.error,
+        error: result.error?.message ?? null,
+      });
       if (result.error)
         throw new Error(result.error.message ?? "Passkey sign-in failed.");
     } catch (err: unknown) {
+      authDebugClient("sign_in.passkey.exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError(getPasskeyErrorMessage(err));
     } finally {
       setLoading(null);
@@ -233,24 +293,41 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   const handleSocial = async (provider: SocialProvider) => {
     setError(null);
     setLoading(provider);
+    authDebugClient("sign_in.social.start", { provider, callbackURL });
     try {
       const result = await signIn.social({
         provider,
         callbackURL,
       });
+      authDebugClient("sign_in.social.result", {
+        provider,
+        hasError: !!result.error,
+        error: result.error?.message ?? null,
+        rawResult: result,
+      });
 
       const redirectUrl = getSocialRedirectUrl(result);
       if (redirectUrl) {
+        authDebugClient("sign_in.social.redirect_url", {
+          provider,
+          redirectUrl,
+        });
         window.location.assign(redirectUrl);
         return;
       }
 
       // Fallback to server route when client redirect URL is unavailable.
-      window.location.assign(getSocialStartUrl(provider, callbackURL));
+      const fallbackUrl = getSocialStartUrl(provider, callbackURL);
+      authDebugClient("sign_in.social.redirect_fallback", {
+        provider,
+        fallbackUrl,
+      });
+      window.location.assign(fallbackUrl);
       return;
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
+      authDebugClient("sign_in.social.exception", { provider, message });
       const normalized = message.toLowerCase();
       if (
         normalized.includes("failed to fetch") ||

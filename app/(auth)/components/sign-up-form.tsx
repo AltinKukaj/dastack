@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
+import { authDebugClient } from "@/lib/auth-debug-client";
 import { signIn, signUp } from "@/lib/auth-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
@@ -51,6 +52,14 @@ function getSocialStartUrl(
   return `/api/auth/sign-in/social?${params.toString()}`;
 }
 
+function maskEmail(email: string): string {
+  const value = email.trim();
+  const [local, domain] = value.split("@");
+  if (!local || !domain) return value;
+  if (local.length <= 2) return `${local[0] ?? "*"}*@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -63,19 +72,28 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const [config, setConfig] = useState<AuthConfig | null>(null);
 
   useEffect(() => {
+    authDebugClient("sign_up.features.load.start", { callbackURL });
     getClientFeatureFlags()
-      .then((data) =>
+      .then((data) => {
+        authDebugClient("sign_up.features.load.success", {
+          callbackURL,
+          flags: data,
+        });
         setConfig({
           emailEnabled: data.email ?? false,
           providers: data.providers,
-        }),
-      )
-      .catch(() =>
+        });
+      })
+      .catch((error) => {
+        authDebugClient("sign_up.features.load.error", {
+          callbackURL,
+          error: error instanceof Error ? error.message : String(error),
+        });
         setConfig({
           emailEnabled: false,
           providers: { discord: false, google: false, github: false },
-        }),
-      );
+        });
+      });
   }, []);
 
   const handleEmailSignUp = async () => {
@@ -93,6 +111,11 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
 
     setError(null);
     setLoading("email");
+    authDebugClient("sign_up.email.start", {
+      email: maskEmail(email),
+      username: username.trim() || null,
+      callbackURL,
+    });
 
     try {
       const result = await signUp.email({
@@ -102,17 +125,30 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
         ...(username.trim() ? { username: username.trim() } : {}),
         callbackURL,
       });
+      authDebugClient("sign_up.email.result", {
+        email: maskEmail(email),
+        hasError: !!result.error,
+        error: result.error?.message ?? null,
+      });
 
       if (result.error) {
         throw new Error(result.error.message ?? "Sign up failed.");
       }
 
       if (config?.emailEnabled) {
+        authDebugClient("sign_up.email.success.verification_required", {
+          email: maskEmail(email),
+        });
         setSuccess(true);
       } else {
+        authDebugClient("sign_up.email.success.redirect", { callbackURL });
         window.location.href = callbackURL;
       }
     } catch (err: unknown) {
+      authDebugClient("sign_up.email.exception", {
+        email: maskEmail(email),
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(null);
@@ -122,24 +158,41 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
   const handleSocial = async (provider: SocialProvider) => {
     setError(null);
     setLoading(provider);
+    authDebugClient("sign_up.social.start", { provider, callbackURL });
     try {
       const result = await signIn.social({
         provider,
         callbackURL,
       });
+      authDebugClient("sign_up.social.result", {
+        provider,
+        hasError: !!result.error,
+        error: result.error?.message ?? null,
+        rawResult: result,
+      });
 
       const redirectUrl = getSocialRedirectUrl(result);
       if (redirectUrl) {
+        authDebugClient("sign_up.social.redirect_url", {
+          provider,
+          redirectUrl,
+        });
         window.location.assign(redirectUrl);
         return;
       }
 
       // Fallback to server route when client redirect URL is unavailable.
-      window.location.assign(getSocialStartUrl(provider, callbackURL));
+      const fallbackUrl = getSocialStartUrl(provider, callbackURL);
+      authDebugClient("sign_up.social.redirect_fallback", {
+        provider,
+        fallbackUrl,
+      });
+      window.location.assign(fallbackUrl);
       return;
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
+      authDebugClient("sign_up.social.exception", { provider, message });
       const normalized = message.toLowerCase();
       if (
         normalized.includes("failed to fetch") ||

@@ -12,6 +12,7 @@ import {
   username,
 } from "better-auth/plugins";
 import Stripe from "stripe";
+import { authDebug } from "./auth-debug";
 import { prisma } from "./db";
 import { env } from "./env";
 import { getFeatureFlags } from "./features";
@@ -34,6 +35,14 @@ function requireValue(value: string | undefined, name: string): string {
  * or BETTER_AUTH_URL), `auth` is `null`. All consumers must check for this.
  */
 function createAuth() {
+  authDebug("create_auth.start", {
+    featureFlags: features,
+    hasPrisma: !!prisma,
+    betterAuthUrl: env.BETTER_AUTH_URL ?? null,
+    nextPublicAppUrl: env.NEXT_PUBLIC_APP_URL ?? null,
+    nodeEnv: process.env.NODE_ENV ?? null,
+  });
+
   if (!features.auth) return null;
 
   const authUrl = new URL(requireValue(env.BETTER_AUTH_URL, "BETTER_AUTH_URL"));

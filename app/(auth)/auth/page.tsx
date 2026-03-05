@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { authDebugClient } from "@/lib/auth-debug-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { getSafeCallbackUrl } from "@/lib/safe-callback-url";
 import { SignInForm } from "../components/sign-in-form";
@@ -53,16 +54,28 @@ function AuthContent() {
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
+    authDebugClient("auth_page.init", {
+      initialTab,
+      callbackURL,
+      oauthErrorMessage,
+    });
     getClientFeatureFlags()
       .then((data) => {
+        authDebugClient("auth_page.features.loaded", { data });
         if (!data.auth) {
+          authDebugClient("auth_page.features.auth_disabled_redirect_home");
           router.replace("/");
         } else {
           setAuthEnabled(true);
         }
       })
-      .catch(() => router.replace("/"));
-  }, [router]);
+      .catch((error) => {
+        authDebugClient("auth_page.features.error_redirect_home", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        router.replace("/");
+      });
+  }, [router, initialTab, callbackURL, oauthErrorMessage]);
 
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const tabContainerRef = useRef<HTMLDivElement>(null);

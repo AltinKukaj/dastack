@@ -8,6 +8,7 @@ import {
   usernameClient,
 } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import { authDebugClient } from "./auth-debug-client";
 import { ac, roleDefinitions } from "./permissions";
 
 export const authClient = createAuthClient({
@@ -25,6 +26,13 @@ export const authClient = createAuthClient({
     stripeClient({ subscription: true }),
   ],
 });
+
+if (typeof window !== "undefined") {
+  authDebugClient("auth_client.init", {
+    configuredBaseUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+    windowOrigin: window.location.origin,
+  });
+}
 
 // Core helpers – used across sign-in, sign-up, and dashboard pages
 export const { signIn, signOut, signUp, useSession } = authClient;

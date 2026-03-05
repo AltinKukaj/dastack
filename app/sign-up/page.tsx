@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { authDebug } from "@/lib/auth-debug";
 import { getSafeCallbackUrl } from "@/lib/safe-callback-url";
 
 export default async function SignUpPage({
@@ -11,5 +12,10 @@ export default async function SignUpPage({
   const url = callbackUrl
     ? `/auth?tab=sign-up&callbackUrl=${encodeURIComponent(callbackUrl)}`
     : "/auth?tab=sign-up";
+  authDebug("sign_up_page.redirect_auth", {
+    rawCallbackUrl: params.callbackUrl ?? null,
+    safeCallbackUrl: callbackUrl,
+    redirectTo: url,
+  });
   redirect(url);
 }
