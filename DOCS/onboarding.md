@@ -80,6 +80,5 @@ If this passes, move to:
 - **Auth appears disabled:** one of the 3 core auth env vars is missing
 - **OAuth redirect mismatch:** provider callback URL does not match `BETTER_AUTH_URL`
 - **Stripe incomplete state:** webhook not connected; use `bun stripe:poll` locally
-- **Captcha missing:** allow `challenges.cloudflare.com` in browser privacy/ad blockers
 
 More fixes: [troubleshooting.md](./troubleshooting.md)

@@ -8,7 +8,7 @@ What to put in `.env` and where to get each key. Start with the core three; add 
 
 - Copy **`.env.example`** -> **`.env`** in the project root.
 - **Core (auth on):** `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`.
-- **Optional:** Add Resend, OAuth, Stripe, or Captcha keys when you want those features.
+- **Optional:** Add Resend, OAuth, or Stripe keys when you want those features.
 - Keep `.env` local only. Never commit it.
 
 ---
@@ -139,32 +139,6 @@ Used by client-side helpers/metadata where a public base URL is needed.
 
 ---
 
-### Captcha (Cloudflare Turnstile)
-
-**Get the keys:** [Cloudflare Dashboard](https://dash.cloudflare.com) -> **Turnstile** -> create a widget -> copy **Site key** and **Secret key**.
-
-```env
-CAPTCHA_SECRET_KEY=...
-NEXT_PUBLIC_CAPTCHA_SITE_KEY=...
-```
-
-Local development defaults:
-
-- Captcha is **off by default on localhost** (to avoid Turnstile domain mismatch issues).
-- To test captcha locally, add localhost to your Turnstile widget allowlist and set:
-
-```env
-ENABLE_CAPTCHA_ON_LOCALHOST=true
-```
-
-Optional hard override (any environment):
-
-```env
-DISABLE_CAPTCHA=true
-```
-
----
-
 ## 4. “Why is my app crashing on startup?”
 
 This project validates env vars at **build/dev time** (`lib/env.ts`). Invalid or missing required vars can make the dev server fail early.
@@ -214,7 +188,3 @@ If startup fails, OAuth callbacks mismatch, emails fail, or Stripe appears stuck
 | `STRIPE_SECRET_KEY` | Optional | Stripe subscriptions and billing APIs |
 | `STRIPE_WEBHOOK_SECRET` | Optional | Stripe webhook verification |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Optional | Stripe client checkout flows |
-| `CAPTCHA_SECRET_KEY` | Optional | Turnstile server verification |
-| `NEXT_PUBLIC_CAPTCHA_SITE_KEY` | Optional | Turnstile widget on auth forms |
-| `ENABLE_CAPTCHA_ON_LOCALHOST` | Optional | Set `true` to allow captcha enforcement on localhost for local Turnstile testing |
-| `DISABLE_CAPTCHA` | Optional | Set `true` to force-disable captcha even when keys are present |

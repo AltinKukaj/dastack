@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import { authClient, signIn, signOut } from "@/lib/auth-client";
+import { authClient, signIn } from "@/lib/auth-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
-import { TurnstileWidget } from "./turnstile-widget";
 
 type SocialProvider = "discord" | "google" | "github";
 type AuthMode = "password" | "magic";
@@ -21,8 +20,6 @@ interface AuthConfig {
   emailEnabled: boolean;
   passkeyEnabled: boolean;
   providers: ProviderConfig;
-  captchaEnabled: boolean;
-  captchaSiteKey: string | null;
 }
 
 interface SignInFormProps {
@@ -45,6 +42,26 @@ function getSocialRedirectUrl(result: unknown): string | null {
     : null;
 }
 
+function getAbsoluteCallbackUrl(callbackURL: string): string {
+  if (typeof window === "undefined") return callbackURL;
+  try {
+    return new URL(callbackURL, window.location.origin).toString();
+  } catch {
+    return callbackURL;
+  }
+}
+
+function getSocialStartUrl(
+  provider: SocialProvider,
+  callbackURL: string,
+): string {
+  const params = new URLSearchParams({
+    provider,
+    callbackURL,
+  });
+  return `/api/auth/sign-in/social?${params.toString()}`;
+}
+
 export function SignInForm({ callbackURL }: SignInFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,7 +72,6 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AuthConfig | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const [twoFactorPending, setTwoFactorPending] = useState(false);
   const [totpCode, setTotpCode] = useState("");
@@ -82,8 +98,6 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           emailEnabled: data.email ?? false,
           passkeyEnabled: data.passkey ?? false,
           providers: data.providers,
-          captchaEnabled: data.captcha ?? false,
-          captchaSiteKey: data.captchaSiteKey ?? null,
         }),
       )
       .catch(() =>
@@ -91,15 +105,12 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           emailEnabled: false,
           passkeyEnabled: false,
           providers: { discord: false, google: false, github: false },
-          captchaEnabled: false,
-          captchaSiteKey: null,
         }),
       );
   }, []);
 
   useEffect(() => {
     if (!config?.passkeyEnabled) return;
-    if (config.captchaEnabled) return;
     if (process.env.NODE_ENV !== "production") return;
     if (typeof window === "undefined") return;
     if (!("PublicKeyCredential" in window)) return;
@@ -127,37 +138,19 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
       .catch(() => {
         // Browser does not support passkey conditional UI.
       });
-  }, [callbackURL, config?.captchaEnabled, config?.passkeyEnabled]);
-
-  const getCaptchaHeaders = (): Record<string, string> => {
-    if (config?.captchaEnabled && captchaToken) {
-      return { "x-captcha-response": captchaToken };
-    }
-    return {};
-  };
-
-  const ensureCaptchaIfRequired = (): boolean => {
-    if (!config?.captchaEnabled) return true;
-    if (captchaToken) return true;
-    setError(
-      "Captcha verification is still missing. If you use an ad/privacy blocker, allow challenges.cloudflare.com and try again.",
-    );
-    return false;
-  };
+  }, [callbackURL, config?.passkeyEnabled]);
 
   const handlePasswordSignIn = async () => {
     if (!email.trim() || !password) return;
-    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading("password");
 
     try {
-      const headers = getCaptchaHeaders();
+      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const result = await signIn.email({
         email: email.trim(),
         password,
-        callbackURL,
-        fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
+        callbackURL: resolvedCallbackURL,
       });
 
       if ((result.data as Record<string, unknown>)?.twoFactorRedirect) {
@@ -212,16 +205,14 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   const handleMagicLink = async () => {
     if (!email.trim()) return;
-    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading("magic");
 
     try {
-      const headers = getCaptchaHeaders();
+      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const { error: magicLinkError } = await signIn.magicLink({
         email: email.trim(),
-        callbackURL,
-        fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
+        callbackURL: resolvedCallbackURL,
       });
       if (magicLinkError) throw new Error(magicLinkError.message);
       setSent(true);
@@ -233,14 +224,11 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   };
 
   const handlePasskey = async () => {
-    if (!ensureCaptchaIfRequired()) return;
     setError(null);
     setLoading("passkey");
     try {
-      const headers = getCaptchaHeaders();
       const result = await authClient.signIn.passkey({
         fetchOptions: {
-          ...(Object.keys(headers).length > 0 ? { headers } : {}),
           onSuccess: () => {
             window.location.href = callbackURL;
           },
@@ -259,14 +247,10 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setError(null);
     setLoading(provider);
     try {
-      // Clear any stale session cookie before starting a new OAuth state flow.
-      await signOut();
-
-      const headers = getCaptchaHeaders();
+      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const result = await signIn.social({
         provider,
-        callbackURL,
-        fetchOptions: Object.keys(headers).length > 0 ? { headers } : undefined,
+        callbackURL: resolvedCallbackURL,
       });
 
       const redirectUrl = getSocialRedirectUrl(result);
@@ -275,14 +259,22 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
         return;
       }
 
-      setError(
-        "Could not start social sign-in redirect. Verify NEXT_PUBLIC_APP_URL and BETTER_AUTH_URL match this domain.",
-      );
-      setLoading(null);
+      // Fallback to server route when client redirect URL is unavailable.
+      window.location.assign(getSocialStartUrl(provider, resolvedCallbackURL));
+      return;
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
       const normalized = message.toLowerCase();
+      if (
+        normalized.includes("failed to fetch") ||
+        normalized.includes("networkerror")
+      ) {
+        window.location.assign(
+          getSocialStartUrl(provider, getAbsoluteCallbackUrl(callbackURL)),
+        );
+        return;
+      }
       if (
         normalized.includes("please_restart_the_process") ||
         normalized.includes("state")
@@ -292,7 +284,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
         );
       } else if (normalized.includes("403")) {
         setError(
-          "Social sign-in was blocked. If captcha or privacy blocking is enabled, try password/magic link or disable strict content blocking and try again.",
+          "Social sign-in was blocked by browser/network security settings. Try a different browser or relax strict privacy blocking and retry.",
         );
       } else {
         setError(message);
@@ -316,8 +308,6 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     : [];
   const emailEnabled = config?.emailEnabled ?? false;
   const passkeyEnabled = config?.passkeyEnabled ?? false;
-  const captchaEnabled = config?.captchaEnabled ?? false;
-  const captchaSiteKey = config?.captchaSiteKey ?? null;
 
   if (twoFactorPending) {
     return (
@@ -584,19 +574,6 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
             ))}
           </div>
         </>
-      )}
-
-      {captchaEnabled && captchaSiteKey && (
-        <TurnstileWidget
-          siteKey={captchaSiteKey}
-          onToken={(token) => setCaptchaToken(token)}
-          onUnavailable={() => {
-            setCaptchaToken(null);
-            setError(
-              "Captcha failed to load. Allow challenges.cloudflare.com, verify your Turnstile widget allows this domain (localhost in dev), or disable strict extension blocking and refresh.",
-            );
-          }}
-        />
       )}
 
       {error && (

@@ -6,7 +6,6 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import {
   admin,
   anonymous,
-  captcha,
   haveIBeenPwned,
   magicLink,
   twoFactor,
@@ -39,6 +38,10 @@ function createAuth() {
 
   const authUrl = new URL(requireValue(env.BETTER_AUTH_URL, "BETTER_AUTH_URL"));
   if (!prisma) return null;
+  const trustedOrigins = [authUrl.origin];
+  if (env.NEXT_PUBLIC_APP_URL) {
+    trustedOrigins.push(new URL(env.NEXT_PUBLIC_APP_URL).origin);
+  }
 
   const plugins = [];
 
@@ -80,25 +83,6 @@ function createAuth() {
     );
   }
 
-  if (features.captcha) {
-    const captchaSecret = requireValue(
-      env.CAPTCHA_SECRET_KEY,
-      "CAPTCHA_SECRET_KEY",
-    );
-    plugins.push(
-      captcha({
-        provider: "cloudflare-turnstile",
-        secretKey: captchaSecret,
-        endpoints: [
-          "/sign-in/email",
-          "/sign-up/email",
-          "/sign-in/passkey",
-          "/sign-in/magic-link",
-        ],
-      }),
-    );
-  }
-
   plugins.push(
     i18n({
       defaultLocale: "en",
@@ -131,6 +115,8 @@ function createAuth() {
   }
 
   return betterAuth({
+    baseURL: authUrl.origin,
+    trustedOrigins: Array.from(new Set(trustedOrigins)),
     database: prismaAdapter(prisma, {
       provider: "postgresql",
     }),

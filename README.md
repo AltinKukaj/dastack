@@ -37,7 +37,7 @@ An opinionated, production-ready Next.js template starter. Clone it, wire up you
 | **Database** | PostgreSQL |
 | **ORM** | [Prisma 7](https://prisma.io) + `@prisma/adapter-pg` |
 | **Auth** | [Better Auth](https://www.better-auth.com) - passkeys · magic link · Discord · Google · GitHub |
-| **Auth plugins** | Admin (custom roles) · Passkey · Stripe · Captcha · i18n · Have I Been Pwned |
+| **Auth plugins** | Admin (custom roles) · Passkey · Stripe · i18n · Have I Been Pwned |
 | **Email** | [Resend](https://resend.com) (default, swappable) |
 | **API** | [tRPC](https://trpc.io) + [TanStack Query](https://tanstack.com/query) |
 | **Styling** | [Tailwind CSS 4](https://tailwindcss.com) |
@@ -79,7 +79,6 @@ Optional integrations are **off by default**. Add the right env vars and the UI 
 | GitHub OAuth | `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | GitHub button |
 | Passkeys (WebAuthn) | none (enabled with core auth) | Passkey sign-in and passkey management |
 | Stripe | `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Pricing page, billing in dashboard |
-| Captcha | `CAPTCHA_SECRET_KEY` + `NEXT_PUBLIC_CAPTCHA_SITE_KEY` | Bot protection on auth |
 
 `/api/features` exposes boolean flags (no secrets) so the client knows what to render. See [DOCS/env.md](./DOCS/env.md) and [DOCS/auth.md](./DOCS/auth.md).
 

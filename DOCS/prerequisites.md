@@ -34,7 +34,6 @@ You only need these if you enable the related feature:
 - **Resend** for magic link / verification / password reset emails
 - **Discord, Google, GitHub** for OAuth sign-in
 - **Stripe** for pricing + billing
-- **Cloudflare Turnstile** for captcha
 
 ---
 

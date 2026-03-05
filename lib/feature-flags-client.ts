@@ -9,8 +9,6 @@ export type ClientFeatureFlags = {
   email: boolean;
   passkey: boolean;
   stripe: boolean;
-  captcha: boolean;
-  captchaSiteKey: string | null;
   providers: ProviderFlags;
 };
 
@@ -19,8 +17,6 @@ const defaultFeatureFlags: ClientFeatureFlags = {
   email: false,
   passkey: false,
   stripe: false,
-  captcha: false,
-  captchaSiteKey: null,
   providers: {
     discord: false,
     google: false,
@@ -49,9 +45,6 @@ function normalizeFeatureFlags(payload: unknown): ClientFeatureFlags {
     email: toBoolean(data.email),
     passkey: toBoolean(data.passkey),
     stripe: toBoolean(data.stripe),
-    captcha: toBoolean(data.captcha),
-    captchaSiteKey:
-      typeof data.captchaSiteKey === "string" ? data.captchaSiteKey : null,
     providers: {
       discord: toBoolean(providersRaw.discord),
       google: toBoolean(providersRaw.google),

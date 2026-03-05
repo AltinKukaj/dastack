@@ -40,11 +40,6 @@ export const env = createEnv({
     GITHUB_CLIENT_ID: z.string().optional(),
     GITHUB_CLIENT_SECRET: z.string().optional(),
 
-    // Captcha (Cloudflare Turnstile)
-    CAPTCHA_SECRET_KEY: z.string().optional(),
-    DISABLE_CAPTCHA: z.string().optional(),
-    ENABLE_CAPTCHA_ON_LOCALHOST: z.string().optional(),
-
     // Stripe
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -53,7 +48,6 @@ export const env = createEnv({
   // ── Client-side variables (prefixed with NEXT_PUBLIC_) ─────────────
   client: {
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
-    NEXT_PUBLIC_CAPTCHA_SITE_KEY: z.string().optional(),
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   },
 
@@ -70,13 +64,9 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
-    CAPTCHA_SECRET_KEY: process.env.CAPTCHA_SECRET_KEY,
-    DISABLE_CAPTCHA: process.env.DISABLE_CAPTCHA,
-    ENABLE_CAPTCHA_ON_LOCALHOST: process.env.ENABLE_CAPTCHA_ON_LOCALHOST,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    NEXT_PUBLIC_CAPTCHA_SITE_KEY: process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY,
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   },

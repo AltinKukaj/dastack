@@ -18,14 +18,12 @@ export function GET() {
       auth: flags.auth,
       email: flags.email,
       passkey: flags.passkey,
-      captchaSiteKey: process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY ?? null,
       providers: {
         discord: flags.discord,
         google: flags.google,
         github: flags.github,
       },
       stripe: flags.stripe,
-      captcha: flags.captcha,
     },
     {
       headers: {

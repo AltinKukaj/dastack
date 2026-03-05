@@ -16,10 +16,6 @@ const FEATURE_ENV_KEYS = [
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
-  "CAPTCHA_SECRET_KEY",
-  "NEXT_PUBLIC_CAPTCHA_SITE_KEY",
-  "DISABLE_CAPTCHA",
-  "ENABLE_CAPTCHA_ON_LOCALHOST",
 ] as const;
 
 const ORIGINAL_FEATURE_ENV = FEATURE_ENV_KEYS.map(
@@ -60,7 +56,6 @@ describe("getFeatureFlags", () => {
       google: false,
       github: false,
       stripe: false,
-      captcha: false,
     });
   });
 
@@ -79,7 +74,6 @@ describe("getFeatureFlags", () => {
       google: false,
       github: false,
       stripe: false,
-      captcha: false,
     });
   });
 
@@ -99,7 +93,6 @@ describe("getFeatureFlags", () => {
       google: false,
       github: false,
       stripe: false,
-      captcha: false,
     });
   });
 
@@ -121,50 +114,6 @@ describe("getFeatureFlags", () => {
       google: false,
       github: false,
       stripe: true,
-      captcha: false,
-    });
-  });
-
-  test("keeps captcha off on localhost by default", () => {
-    applyEnv({
-      DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public",
-      BETTER_AUTH_SECRET: "test-secret",
-      BETTER_AUTH_URL: "http://localhost:3000",
-      CAPTCHA_SECRET_KEY: "turnstile-secret",
-      NEXT_PUBLIC_CAPTCHA_SITE_KEY: "turnstile-site-key",
-    });
-
-    expect(getFeatureFlags()).toEqual({
-      auth: true,
-      email: false,
-      passkey: true,
-      discord: false,
-      google: false,
-      github: false,
-      stripe: false,
-      captcha: false,
-    });
-  });
-
-  test("allows captcha on localhost when explicitly enabled", () => {
-    applyEnv({
-      DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public",
-      BETTER_AUTH_SECRET: "test-secret",
-      BETTER_AUTH_URL: "http://localhost:3000",
-      CAPTCHA_SECRET_KEY: "turnstile-secret",
-      NEXT_PUBLIC_CAPTCHA_SITE_KEY: "turnstile-site-key",
-      ENABLE_CAPTCHA_ON_LOCALHOST: "true",
-    });
-
-    expect(getFeatureFlags()).toEqual({
-      auth: true,
-      email: false,
-      passkey: true,
-      discord: false,
-      google: false,
-      github: false,
-      stripe: false,
-      captcha: true,
     });
   });
 });
