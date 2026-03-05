@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import { authDebugClient } from "@/lib/auth-debug-client";
 import { signIn, signUp } from "@/lib/auth-client";
+import { authDebugClient } from "@/lib/auth-debug-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
 import { SocialButton, Spinner } from "./shared";
@@ -94,7 +94,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
           providers: { discord: false, google: false, github: false },
         });
       });
-  }, []);
+  }, [callbackURL]);
 
   const handleEmailSignUp = async () => {
     if (!name.trim() || !email.trim() || !password) return;

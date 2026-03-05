@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { authDebugClient } from "@/lib/auth-debug-client";
 import { signOut, useSession } from "@/lib/auth-client";
+import { authDebugClient } from "@/lib/auth-debug-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { useAppStore } from "@/lib/store";
 import { trpc } from "@/lib/trpc";

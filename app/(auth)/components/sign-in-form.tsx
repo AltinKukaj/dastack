@@ -116,7 +116,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           providers: { discord: false, google: false, github: false },
         });
       });
-  }, []);
+  }, [callbackURL]);
 
   useEffect(() => {
     if (!config?.passkeyEnabled) return;
