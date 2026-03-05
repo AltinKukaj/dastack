@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import { signIn, signUp } from "@/lib/auth-client";
+import { signUp } from "@/lib/auth-client";
 import { authDebugClient } from "@/lib/auth-debug-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { DiscordIcon, GitHubIcon, GoogleIcon } from "./icons";
@@ -25,22 +25,6 @@ interface SignUpFormProps {
   callbackURL: string;
 }
 
-function getSocialRedirectUrl(result: unknown): string | null {
-  if (!result || typeof result !== "object") return null;
-
-  const directUrl =
-    "url" in result && typeof result.url === "string" ? result.url : null;
-  if (directUrl) return directUrl;
-
-  if (!("data" in result) || !result.data || typeof result.data !== "object") {
-    return null;
-  }
-
-  return "url" in result.data && typeof result.data.url === "string"
-    ? result.data.url
-    : null;
-}
-
 function getSocialStartUrl(
   provider: SocialProvider,
   callbackURL: string,
@@ -48,6 +32,8 @@ function getSocialStartUrl(
   const params = new URLSearchParams({
     provider,
     callbackURL,
+    newUserCallbackURL: callbackURL,
+    errorCallbackURL: "/auth?tab=sign-up&oauthError=oauth_flow_failed",
   });
   return `/api/auth/sign-in/social?${params.toString()}`;
 }
@@ -159,64 +145,14 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
     setError(null);
     setLoading(provider);
     authDebugClient("sign_up.social.start", { provider, callbackURL });
-    try {
-      const result = await signIn.social({
-        provider,
-        callbackURL,
-      });
-      authDebugClient("sign_up.social.result", {
-        provider,
-        hasError: !!result.error,
-        error: result.error?.message ?? null,
-        rawResult: result,
-      });
-
-      const redirectUrl = getSocialRedirectUrl(result);
-      if (redirectUrl) {
-        authDebugClient("sign_up.social.redirect_url", {
-          provider,
-          redirectUrl,
-        });
-        window.location.assign(redirectUrl);
-        return;
-      }
-
-      // Fallback to server route when client redirect URL is unavailable.
-      const fallbackUrl = getSocialStartUrl(provider, callbackURL);
-      authDebugClient("sign_up.social.redirect_fallback", {
-        provider,
-        fallbackUrl,
-      });
-      window.location.assign(fallbackUrl);
-      return;
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      authDebugClient("sign_up.social.exception", { provider, message });
-      const normalized = message.toLowerCase();
-      if (
-        normalized.includes("failed to fetch") ||
-        normalized.includes("networkerror")
-      ) {
-        window.location.assign(getSocialStartUrl(provider, callbackURL));
-        return;
-      }
-      if (
-        normalized.includes("please_restart_the_process") ||
-        normalized.includes("state")
-      ) {
-        setError(
-          "Social sign-up session expired. Please try again (this refreshes the OAuth state cookie).",
-        );
-      } else if (normalized.includes("403")) {
-        setError(
-          "Social sign-up was blocked by browser/network security settings. Try a different browser or relax strict privacy blocking and retry.",
-        );
-      } else {
-        setError(message);
-      }
-      setLoading(null);
-    }
+    // Start OAuth on the server route directly so state/session cookies
+    // are established via a top-level navigation response in production.
+    const startUrl = getSocialStartUrl(provider, callbackURL);
+    authDebugClient("sign_up.social.redirect_server_start", {
+      provider,
+      startUrl,
+    });
+    window.location.assign(startUrl);
   };
 
   const socialButtons: {
