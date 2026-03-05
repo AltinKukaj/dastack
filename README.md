@@ -1,6 +1,8 @@
 # dastack
 
-An opinionated, production-ready Next.js template starter. Clone it, wire up your own providers, and build your own product.
+**Build on structure.** An opinionated, production-ready Next.js template starter. Auth, data access, and a typed API surface, already wired. Clone it, wire up your own providers, and build your own product.
+
+![dastack landing page](public/dastack.png)
 
 ---
 

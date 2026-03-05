@@ -42,15 +42,6 @@ function getSocialRedirectUrl(result: unknown): string | null {
     : null;
 }
 
-function getAbsoluteCallbackUrl(callbackURL: string): string {
-  if (typeof window === "undefined") return callbackURL;
-  try {
-    return new URL(callbackURL, window.location.origin).toString();
-  } catch {
-    return callbackURL;
-  }
-}
-
 function getSocialStartUrl(
   provider: SocialProvider,
   callbackURL: string,
@@ -112,6 +103,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
   useEffect(() => {
     if (!config?.passkeyEnabled) return;
     if (typeof window === "undefined") return;
+    if (!window.isSecureContext) return;
     if (!("PublicKeyCredential" in window)) return;
 
     const maybeCredentialApi =
@@ -143,11 +135,10 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setLoading("password");
 
     try {
-      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const result = await signIn.email({
         email: email.trim(),
         password,
-        callbackURL: resolvedCallbackURL,
+        callbackURL,
       });
 
       if ((result.data as Record<string, unknown>)?.twoFactorRedirect) {
@@ -206,10 +197,9 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setLoading("magic");
 
     try {
-      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const { error: magicLinkError } = await signIn.magicLink({
         email: email.trim(),
-        callbackURL: resolvedCallbackURL,
+        callbackURL,
       });
       if (magicLinkError) throw new Error(magicLinkError.message);
       setSent(true);
@@ -244,10 +234,9 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
     setError(null);
     setLoading(provider);
     try {
-      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const result = await signIn.social({
         provider,
-        callbackURL: resolvedCallbackURL,
+        callbackURL,
       });
 
       const redirectUrl = getSocialRedirectUrl(result);
@@ -257,7 +246,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
       }
 
       // Fallback to server route when client redirect URL is unavailable.
-      window.location.assign(getSocialStartUrl(provider, resolvedCallbackURL));
+      window.location.assign(getSocialStartUrl(provider, callbackURL));
       return;
     } catch (err: unknown) {
       const message =
@@ -267,9 +256,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
         normalized.includes("failed to fetch") ||
         normalized.includes("networkerror")
       ) {
-        window.location.assign(
-          getSocialStartUrl(provider, getAbsoluteCallbackUrl(callbackURL)),
-        );
+        window.location.assign(getSocialStartUrl(provider, callbackURL));
         return;
       }
       if (

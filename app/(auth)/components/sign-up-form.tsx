@@ -40,15 +40,6 @@ function getSocialRedirectUrl(result: unknown): string | null {
     : null;
 }
 
-function getAbsoluteCallbackUrl(callbackURL: string): string {
-  if (typeof window === "undefined") return callbackURL;
-  try {
-    return new URL(callbackURL, window.location.origin).toString();
-  } catch {
-    return callbackURL;
-  }
-}
-
 function getSocialStartUrl(
   provider: SocialProvider,
   callbackURL: string,
@@ -104,13 +95,12 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
     setLoading("email");
 
     try {
-      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const result = await signUp.email({
         name: name.trim(),
         email: email.trim(),
         password,
         ...(username.trim() ? { username: username.trim() } : {}),
-        callbackURL: resolvedCallbackURL,
+        callbackURL,
       });
 
       if (result.error) {
@@ -133,10 +123,9 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
     setError(null);
     setLoading(provider);
     try {
-      const resolvedCallbackURL = getAbsoluteCallbackUrl(callbackURL);
       const result = await signIn.social({
         provider,
-        callbackURL: resolvedCallbackURL,
+        callbackURL,
       });
 
       const redirectUrl = getSocialRedirectUrl(result);
@@ -146,7 +135,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
       }
 
       // Fallback to server route when client redirect URL is unavailable.
-      window.location.assign(getSocialStartUrl(provider, resolvedCallbackURL));
+      window.location.assign(getSocialStartUrl(provider, callbackURL));
       return;
     } catch (err: unknown) {
       const message =
@@ -156,9 +145,7 @@ export function SignUpForm({ callbackURL }: SignUpFormProps) {
         normalized.includes("failed to fetch") ||
         normalized.includes("networkerror")
       ) {
-        window.location.assign(
-          getSocialStartUrl(provider, getAbsoluteCallbackUrl(callbackURL)),
-        );
+        window.location.assign(getSocialStartUrl(provider, callbackURL));
         return;
       }
       if (

@@ -2,6 +2,10 @@
 
 **Start here.** These docs are written for beginners. Follow the order below and you won’t get lost.
 
+![dastack landing page](../public/dastack.png)
+
+*The dastack landing page — auth, typed API, and a lean stack, ready to customize.*
+
 ---
 
 ## One idea to remember
