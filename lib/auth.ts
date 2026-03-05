@@ -25,7 +25,19 @@ function createAuth() {
 
   const authUrlRaw = env.BETTER_AUTH_URL;
   if (!authUrlRaw) return null;
+  const authSecret = env.BETTER_AUTH_SECRET;
+  if (!authSecret) return null;
   const authUrl = new URL(authUrlRaw);
+  const trustedOrigins = [env.BETTER_AUTH_URL, env.NEXT_PUBLIC_APP_URL]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      try {
+        return new URL(value).origin;
+      } catch {
+        return null;
+      }
+    })
+    .filter((value): value is string => Boolean(value));
   const plugins = [];
 
   if (features.email) {
@@ -79,6 +91,13 @@ function createAuth() {
   }
 
   return betterAuth({
+    secret: authSecret,
+    baseURL: authUrl.origin,
+    trustedOrigins,
+    advanced: {
+      trustedProxyHeaders: true,
+      useSecureCookies: authUrl.protocol === "https:",
+    },
     database: prismaAdapter(prisma, { provider: "postgresql" }),
     experimental: { joins: true },
 

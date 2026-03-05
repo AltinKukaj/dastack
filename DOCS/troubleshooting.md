@@ -88,6 +88,22 @@ Related docs: [auth.md](./auth.md), [env.md](./env.md)
 
 ---
 
+## OAuth works locally but fails in Docker/production
+
+If the provider login succeeds but you land on `/` (or lose session on callback), verify env parsing and proxy trust first.
+
+**Checklist:**
+
+- Do **not** use inline comments in Docker env values.  
+  Example of bad value in Docker env files:  
+  `BETTER_AUTH_URL=https://create.dagrate.xyz # prod url`  
+  (Docker treats everything after `=` as value.)
+- Ensure `BETTER_AUTH_URL` is exactly your deployed origin (no trailing comments/spaces).
+- Ensure reverse proxy forwards `X-Forwarded-Host` and `X-Forwarded-Proto`.
+- Confirm the app was rebuilt when changing `NEXT_PUBLIC_*` variables (they are baked at build time).
+
+---
+
 ## Passkey errors (`P2021` / `public.passkey` does not exist)
 
 If you see errors like:
@@ -106,7 +122,7 @@ bun db:generate
 bun db:push
 ```
 
-2. Or disable passkeys if you do not need them:
+1. Or disable passkeys if you do not need them:
 
 ```env
 DISABLE_PASSKEY=true
