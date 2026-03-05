@@ -38,10 +38,6 @@ function createAuth() {
 
   const authUrl = new URL(requireValue(env.BETTER_AUTH_URL, "BETTER_AUTH_URL"));
   if (!prisma) return null;
-  const trustedOrigins = [authUrl.origin];
-  if (env.NEXT_PUBLIC_APP_URL) {
-    trustedOrigins.push(new URL(env.NEXT_PUBLIC_APP_URL).origin);
-  }
 
   const plugins = [];
 
@@ -115,8 +111,6 @@ function createAuth() {
   }
 
   return betterAuth({
-    baseURL: authUrl.origin,
-    trustedOrigins: Array.from(new Set(trustedOrigins)),
     database: prismaAdapter(prisma, {
       provider: "postgresql",
     }),

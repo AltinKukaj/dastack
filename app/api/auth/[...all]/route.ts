@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
  * When auth is disabled (no env vars configured), returns a JSON 404
  * instead of crashing.
  */
-async function handler(req: Request) {
+function handler(req: Request) {
   if (!auth) {
     return NextResponse.json(
       {
@@ -20,8 +20,6 @@ async function handler(req: Request) {
 
   const url = new URL(req.url);
   if (url.pathname.endsWith("/api/auth/error")) {
-    // In production behind reverse proxies, req.url may resolve to an internal
-    // origin (e.g. 0.0.0.0:3000). Prefer BETTER_AUTH_URL for user-facing redirects.
     const redirectBase = process.env.BETTER_AUTH_URL ?? req.url;
     const redirectTarget = new URL("/auth", redirectBase);
     redirectTarget.searchParams.set("tab", "sign-in");
@@ -32,7 +30,7 @@ async function handler(req: Request) {
     return NextResponse.redirect(redirectTarget);
   }
 
-  const { toNextJsHandler } = await import("better-auth/next-js");
+  const { toNextJsHandler } = require("better-auth/next-js");
   const { GET, POST } = toNextJsHandler(auth);
   if (req.method === "GET") return GET(req);
   return POST(req);
