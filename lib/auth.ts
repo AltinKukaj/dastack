@@ -12,7 +12,6 @@ import {
   username,
 } from "better-auth/plugins";
 import Stripe from "stripe";
-import { authDebug } from "./auth-debug";
 import { prisma } from "./db";
 import { env } from "./env";
 import { getFeatureFlags } from "./features";
@@ -21,45 +20,16 @@ import { stripePlans } from "./stripe-plans.generated";
 
 const features = getFeatureFlags();
 
-function requireValue(value: string | undefined, name: string): string {
-  if (!value) {
-    throw new Error(`[auth] Missing required env: ${name}`);
-  }
-  return value;
-}
-
-/**
- * Better Auth server instance.
- *
- * When the auth feature is disabled (missing DATABASE_URL, BETTER_AUTH_SECRET,
- * or BETTER_AUTH_URL), `auth` is `null`. All consumers must check for this.
- */
 function createAuth() {
-  authDebug("create_auth.start", {
-    featureFlags: features,
-    hasPrisma: !!prisma,
-    betterAuthUrl: env.BETTER_AUTH_URL ?? null,
-    nextPublicAppUrl: env.NEXT_PUBLIC_APP_URL ?? null,
-    nodeEnv: process.env.NODE_ENV ?? null,
-  });
+  if (!features.auth || !prisma) return null;
 
-  if (!features.auth) return null;
-
-  const authUrl = new URL(requireValue(env.BETTER_AUTH_URL, "BETTER_AUTH_URL"));
-  if (!prisma) return null;
-
+  const authUrl = new URL(env.BETTER_AUTH_URL!);
   const plugins = [];
 
   if (features.email) {
     plugins.push(
       magicLink({
-        sendMagicLink: async ({
-          email,
-          url,
-        }: {
-          email: string;
-          url: string;
-        }) => {
+        sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
           const { sendMagicLinkEmail } = await import("./email");
           await sendMagicLinkEmail({ email, url });
         },
@@ -68,12 +38,7 @@ function createAuth() {
   }
 
   plugins.push(haveIBeenPwned());
-  plugins.push(
-    admin({
-      ac,
-      roles: roleDefinitions,
-    }),
-  );
+  plugins.push(admin({ ac, roles: roleDefinitions }));
   plugins.push(twoFactor());
   plugins.push(username());
   plugins.push(anonymous());
@@ -88,57 +53,29 @@ function createAuth() {
     );
   }
 
-  plugins.push(
-    i18n({
-      defaultLocale: "en",
-      translations: {
-        en: {},
-      },
-    }),
-  );
+  plugins.push(i18n({ defaultLocale: "en", translations: { en: {} } }));
 
   if (features.stripe) {
-    const stripeSecret = requireValue(
-      env.STRIPE_SECRET_KEY,
-      "STRIPE_SECRET_KEY",
-    );
-    const stripeWebhookSecret = requireValue(
-      env.STRIPE_WEBHOOK_SECRET,
-      "STRIPE_WEBHOOK_SECRET",
-    );
     plugins.push(
       stripe({
-        stripeClient: new Stripe(stripeSecret),
-        stripeWebhookSecret,
+        stripeClient: new Stripe(env.STRIPE_SECRET_KEY!),
+        stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET!,
         createCustomerOnSignUp: false,
-        subscription: {
-          enabled: true,
-          plans: stripePlans,
-        },
+        subscription: { enabled: true, plans: stripePlans },
       }),
     );
   }
 
   return betterAuth({
-    database: prismaAdapter(prisma, {
-      provider: "postgresql",
-    }),
-    experimental: {
-      joins: true,
-    },
+    database: prismaAdapter(prisma, { provider: "postgresql" }),
+    experimental: { joins: true },
 
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
       ...(features.email
         ? {
-            sendResetPassword: async ({
-              user,
-              url,
-            }: {
-              user: { email: string };
-              url: string;
-            }) => {
+            sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
               const { sendPasswordResetEmail } = await import("./email");
               await sendPasswordResetEmail({ email: user.email, url });
             },
@@ -151,15 +88,9 @@ function createAuth() {
           emailVerification: {
             sendOnSignUp: false,
             autoSignInAfterVerification: true,
-            sendVerificationEmail: async ({
-              user,
-              url,
-            }: {
-              user: { email: string };
-              url: string;
-            }) => {
-              const mod = await import("./email");
-              await mod.sendVerificationEmail({ email: user.email, url });
+            sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
+              const { sendVerificationEmail } = await import("./email");
+              await sendVerificationEmail({ email: user.email, url });
             },
           },
         }
@@ -167,30 +98,13 @@ function createAuth() {
 
     socialProviders: {
       ...(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET
-        ? {
-            discord: {
-              clientId: env.DISCORD_CLIENT_ID,
-              clientSecret: env.DISCORD_CLIENT_SECRET,
-              // Avoid silent OAuth failures that can happen with prompt=none.
-              prompt: "consent",
-            },
-          }
+        ? { discord: { clientId: env.DISCORD_CLIENT_ID, clientSecret: env.DISCORD_CLIENT_SECRET, prompt: "consent" } }
         : {}),
       ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-        ? {
-            google: {
-              clientId: env.GOOGLE_CLIENT_ID,
-              clientSecret: env.GOOGLE_CLIENT_SECRET,
-            },
-          }
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
         : {}),
       ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
-        ? {
-            github: {
-              clientId: env.GITHUB_CLIENT_ID,
-              clientSecret: env.GITHUB_CLIENT_SECRET,
-            },
-          }
+        ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
         : {}),
     },
 

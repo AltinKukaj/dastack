@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut, useSession } from "@/lib/auth-client";
-import { authDebugClient } from "@/lib/auth-debug-client";
 import { getClientFeatureFlags } from "@/lib/feature-flags-client";
 import { useAppStore } from "@/lib/store";
 import { trpc } from "@/lib/trpc";
@@ -52,38 +51,15 @@ export default function DashboardPage() {
   );
 
   useEffect(() => {
-    authDebugClient("dashboard.client.feature_load.start");
     getClientFeatureFlags()
-      .then((data) => {
-        authDebugClient("dashboard.client.feature_load.success", data);
-        setStripeEnabled(data.stripe ?? false);
-      })
-      .catch((error) => {
-        authDebugClient("dashboard.client.feature_load.error", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
+      .then((data) => setStripeEnabled(data.stripe))
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    authDebugClient("dashboard.client.session_state", {
-      isPending,
-      hasSession: !!session,
-      userId: session?.user?.id ?? null,
-      email: session?.user?.email ?? null,
-    });
-  }, [isPending, session]);
-
   const handleSignOut = async () => {
-    authDebugClient("dashboard.sign_out.start");
     await signOut({
       fetchOptions: {
-        onSuccess: () => {
-          authDebugClient("dashboard.sign_out.success.redirect", {
-            redirectTo: "/sign-in",
-          });
-          router.push("/sign-in");
-        },
+        onSuccess: () => router.push("/sign-in"),
       },
     });
   };
