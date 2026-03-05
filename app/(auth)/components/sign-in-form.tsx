@@ -111,7 +111,6 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
 
   useEffect(() => {
     if (!config?.passkeyEnabled) return;
-    if (process.env.NODE_ENV !== "production") return;
     if (typeof window === "undefined") return;
     if (!("PublicKeyCredential" in window)) return;
 
@@ -126,7 +125,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
       .isConditionalMediationAvailable()
       .then((supported) => {
         if (!supported) return;
-        void authClient.signIn.passkey({
+        return authClient.signIn.passkey({
           autoFill: true,
           fetchOptions: {
             onSuccess: () => {
@@ -135,9 +134,7 @@ export function SignInForm({ callbackURL }: SignInFormProps) {
           },
         });
       })
-      .catch(() => {
-        // Browser does not support passkey conditional UI.
-      });
+      .catch(() => {});
   }, [callbackURL, config?.passkeyEnabled]);
 
   const handlePasswordSignIn = async () => {

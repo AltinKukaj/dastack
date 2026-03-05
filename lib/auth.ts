@@ -126,6 +126,7 @@ function createAuth() {
 
     emailAndPassword: {
       enabled: true,
+      requireEmailVerification: false,
       ...(features.email
         ? {
             sendResetPassword: async ({
@@ -145,7 +146,7 @@ function createAuth() {
     ...(features.email
       ? {
           emailVerification: {
-            sendOnSignUp: true,
+            sendOnSignUp: false,
             autoSignInAfterVerification: true,
             sendVerificationEmail: async ({
               user,

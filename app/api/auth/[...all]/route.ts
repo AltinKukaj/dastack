@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
  * When auth is disabled (no env vars configured), returns a JSON 404
  * instead of crashing.
  */
-function handler(req: Request) {
+async function handler(req: Request) {
   if (!auth) {
     return NextResponse.json(
       {
@@ -32,7 +32,7 @@ function handler(req: Request) {
     return NextResponse.redirect(redirectTarget);
   }
 
-  const { toNextJsHandler } = require("better-auth/next-js");
+  const { toNextJsHandler } = await import("better-auth/next-js");
   const { GET, POST } = toNextJsHandler(auth);
   if (req.method === "GET") return GET(req);
   return POST(req);
