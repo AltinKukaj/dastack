@@ -248,11 +248,11 @@ export default function PricingClient({
                 Payments not configured
               </h2>
               <p className="mt-2 text-[13px] text-zinc-500">
-                Add your Stripe credentials to{" "}
+                Set these in your{" "}
                 <code className="rounded bg-zinc-800/50 px-1.5 py-0.5 text-[12px] text-white">
                   .env
                 </code>{" "}
-                before restarting the server.
+                (or in your host&apos;s environment / dashboard for production), then restart or redeploy.
               </p>
               <div className="mt-5 space-y-2 text-left">
                 {[
