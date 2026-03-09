@@ -35,7 +35,7 @@
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "recharts": "^3.7.0",
+    "recharts": "^3.8.0",
     "redis": "^5.11.0",
     "resend": "^6.9.3",
     "server-only": "^0.0.1",
