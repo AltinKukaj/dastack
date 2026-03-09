@@ -1,77 +1,48 @@
+/** Global error boundary — renders a standalone HTML shell when the root layout itself errors. */
 "use client";
 
-export default function GlobalError({
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function GlobalError({ reset }: { reset: () => void }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
         style={{
           margin: 0,
-          minHeight: "100vh",
+          minHeight: "100dvh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#09090b",
-          color: "#fafafa",
-          fontFamily:
-            "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
-          padding: "24px",
+          background: "#0a0a0a",
+          color: "#fff",
+          fontFamily: "system-ui, sans-serif",
         }}
       >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "28rem",
-            textAlign: "center",
-          }}
-        >
+        <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
           <p
             style={{
-              margin: 0,
-              fontSize: "0.6875rem",
-              letterSpacing: "0.2em",
-              color: "#404040",
-              fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+              fontSize: 11,
+              color: "#555",
+              fontFamily: "monospace",
             }}
           >
             500
           </p>
-          <h1
-            style={{
-              margin: "20px 0 0",
-              fontSize: "1.875rem",
-              fontWeight: 400,
-              letterSpacing: "-0.025em",
-              fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
-            }}
-          >
+          <h1 style={{ marginTop: 20, fontSize: 28, fontWeight: 400 }}>
             Something went wrong
           </h1>
-          <p
-            style={{
-              margin: "12px 0 0",
-              fontSize: "0.875rem",
-              lineHeight: 1.75,
-              color: "#525252",
-            }}
-          >
-            A critical error occurred while rendering the application.
+          <p style={{ marginTop: 12, fontSize: 14, color: "#666", lineHeight: 1.7 }}>
+            A critical error occurred. Please try again.
           </p>
           <button
             type="button"
-            onClick={() => reset()}
+            onClick={reset}
             style={{
-              marginTop: "32px",
-              borderRadius: "8px",
-              border: "1px solid #262626",
-              backgroundColor: "transparent",
+              marginTop: 32,
               padding: "10px 20px",
-              fontSize: "0.875rem",
-              color: "#a3a3a3",
+              fontSize: 14,
+              color: "#999",
+              background: "transparent",
+              border: "1px solid #333",
+              borderRadius: 8,
               cursor: "pointer",
             }}
           >

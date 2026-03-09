@@ -1,33 +1,81 @@
+import { hasConfiguredStripePlans } from "@/lib/plans";
+
 /**
- * Centralized feature flags -- "env key in -> feature on".
+ * Configuration-aware feature flags.
  *
- * Server components and API routes call getFeatureFlags() directly.
- * Client components fetch /api/features instead.
+ * Credential-backed features enable automatically when their required keys
+ * exist. Boolean flags only turn on for explicit true-ish values so
+ * `ENABLE_FOO=false` behaves correctly in starter deployments.
  */
-export function getFeatureFlags() {
-  const authEnabled = !!(
-    process.env.DATABASE_URL &&
-    process.env.BETTER_AUTH_SECRET &&
-    process.env.BETTER_AUTH_URL
-  );
+
+function hasValue(key: string): boolean {
+  return typeof process.env[key] === "string" && process.env[key]!.trim().length > 0;
+}
+
+function isEnabledFlag(key: string): boolean {
+  const raw = process.env[key]?.trim().toLowerCase();
+  return raw === "true" || raw === "1" || raw === "yes" || raw === "on";
+}
+
+function hasStripeCredentials() {
+  return hasValue("STRIPE_SECRET_KEY") && hasValue("STRIPE_WEBHOOK_SECRET");
+}
+
+export interface StripeBillingReadiness {
+  stripeConfigured: boolean;
+  stripePlansReady: boolean;
+  checkoutEnabled: boolean;
+}
+
+export function getStripeBillingReadiness(): StripeBillingReadiness {
+  const stripeConfigured = hasStripeCredentials();
+  const stripePlansReady = hasConfiguredStripePlans();
 
   return {
-    auth: authEnabled,
-    email: authEnabled && !!process.env.RESEND_API_KEY,
-    passkey: authEnabled && process.env.DISABLE_PASSKEY !== "true",
-    discord:
-      authEnabled &&
-      !!(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
-    google:
-      authEnabled &&
-      !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    github:
-      authEnabled &&
-      !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-    stripe:
-      authEnabled &&
-      !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+    stripeConfigured,
+    stripePlansReady,
+    checkoutEnabled: stripeConfigured && stripePlansReady,
+  };
+}
+
+export function getFeatureFlags() {
+  const readiness = getStripeBillingReadiness();
+
+  return {
+    stripe: readiness.stripeConfigured,
+    email: hasValue("RESEND_API_KEY"),
+    google: hasValue("GOOGLE_CLIENT_ID"),
+    github: hasValue("GITHUB_CLIENT_ID"),
+    discord: hasValue("DISCORD_CLIENT_ID"),
+    organizations: isEnabledFlag("ENABLE_ORGANIZATIONS"),
+    redis: isEnabledFlag("ENABLE_REDIS_CACHE"),
+    uploads: hasValue("UPLOADTHING_TOKEN"),
+    adminPanel: isEnabledFlag("ENABLE_ADMIN_PANEL"),
   };
 }
 
 export type FeatureFlags = ReturnType<typeof getFeatureFlags>;
+
+export function isPaymentsEnabled(): boolean {
+  return getStripeBillingReadiness().stripeConfigured;
+}
+
+export function isStripeCheckoutEnabled(): boolean {
+  return getStripeBillingReadiness().checkoutEnabled;
+}
+
+export function isOrganizationsEnabled(): boolean {
+  return getFeatureFlags().organizations;
+}
+
+export function isRedisEnabled(): boolean {
+  return getFeatureFlags().redis;
+}
+
+export function isUploadsEnabled(): boolean {
+  return getFeatureFlags().uploads;
+}
+
+export function isAdminPanelEnabled(): boolean {
+  return getFeatureFlags().adminPanel;
+}

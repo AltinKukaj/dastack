@@ -1,10 +1,22 @@
+// ---------------------------------------------------------------------------
+// DaStack — Prisma Schema
+//
+// Defines every database model for the template: Better Auth core tables,
+// plugin tables (passkeys, 2FA, orgs, subscriptions), and custom tables
+// for entitlements, audit logging, webhook idempotency, and file uploads.
+//
+// The `datasource` block intentionally omits `url` because the PrismaPg
+// driver adapter receives the connection string at runtime via `lib/prisma.ts`.
+// ---------------------------------------------------------------------------
+
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  // url is supplied at runtime by the PrismaPg adapter — see lib/prisma.ts
 }
 
 model User {
@@ -15,29 +27,36 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  passkeys      Passkey[]
+
+  // Username plugin
+  username        String? @unique
+  displayUsername String? @unique
+
+  // Anonymous plugin
+  isAnonymous Boolean?
+
+  // Two-Factor plugin
+  twoFactorEnabled Boolean?
 
   // Admin plugin
-  role       String?   @default("user")
-  banned     Boolean?  @default(false)
-  banReason  String?
+  role      String?
+  banned    Boolean?
+  banReason String?
   banExpires DateTime?
+
+  // Last Login Method plugin
+  lastLoginMethod String?
 
   // Stripe plugin
   stripeCustomerId String?
 
-  // 2FA plugin
-  twoFactorEnabled Boolean?
-  twoFactors       TwoFactor[]
-
-  // Username plugin
-  username        String?  @unique
-  displayUsername String?
-
-  // Anonymous plugin
-  isAnonymous Boolean?
+  sessions      Session[]
+  accounts      Account[]
+  passkeys      Passkey[]
+  twoFactors    TwoFactor[]
+  subscriptions Subscription[]
+  members       Member[]
+  invitations   Invitation[]
 
   @@unique([email])
   @@map("user")
@@ -54,8 +73,11 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Admin plugin
+  // Admin plugin (impersonation)
   impersonatedBy String?
+
+  // Organization plugin
+  activeOrganizationId String?
 
   @@unique([token])
   @@index([userId])
@@ -82,7 +104,17 @@ model Account {
   @@map("account")
 }
 
-// Passkey plugin
+model Verification {
+  id         String   @id
+  identifier String   @unique
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
 model Passkey {
   id           String   @id
   name         String?
@@ -94,27 +126,24 @@ model Passkey {
   deviceType   String
   backedUp     Boolean
   transports   String?
-  createdAt    DateTime?
   aaguid       String?
+  createdAt    DateTime @default(now())
 
-  @@unique([credentialID])
   @@index([userId])
   @@map("passkey")
 }
 
-model Verification {
-  id         String   @id
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model TwoFactor {
+  id          String  @id
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret      String?
+  backupCodes String?
 
-  @@unique([identifier])
-  @@map("verification")
+  @@index([userId])
+  @@map("twoFactor")
 }
 
-// Stripe plugin
 model Subscription {
   id                   String    @id
   plan                 String
@@ -131,24 +160,172 @@ model Subscription {
   seats                Int?
   trialStart           DateTime?
   trialEnd             DateTime?
-  metadata             String?
   billingInterval      String?
   stripeScheduleId     String?
+  metadata             String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([referenceId])
+  @@index([stripeSubscriptionId])
   @@map("subscription")
 }
 
-// 2FA plugin
-model TwoFactor {
-  id          String @id
-  secret      String
-  backupCodes String
-  userId      String
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+// ---------------------------------------------------------------------------
+// Organization plugin models
+// ---------------------------------------------------------------------------
 
+model Organization {
+  id        String   @id
+  name      String
+  slug      String   @unique
+  logo      String?
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  members     Member[]
+  invitations Invitation[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String   @id
+  organizationId String
+  userId         String
+  role           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
   @@index([userId])
-  @@map("twoFactor")
+  @@map("member")
+}
+
+model Invitation {
+  id               String   @id
+  organizationId   String
+  email            String
+  role             String?
+  status           String
+  inviterId        String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitation")
+}
+
+// ---------------------------------------------------------------------------
+// Entitlements and usage metering
+// ---------------------------------------------------------------------------
+
+model Entitlement {
+  id          String   @id @default(cuid())
+  subjectId   String
+  subjectType String   // "user" | "organization"
+  featureKey  String
+  value       Boolean  @default(true)
+  metadata    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([subjectId, featureKey])
+  @@index([subjectId])
+  @@map("entitlement")
+}
+
+model UsageRecord {
+  id          String   @id @default(cuid())
+  subjectId   String
+  subjectType String
+  meterKey    String
+  quantity    Int      @default(0)
+  periodStart DateTime
+  periodEnd   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([subjectId, meterKey, periodStart])
+  @@index([subjectId, meterKey])
+  @@map("usage_record")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorType   String   @default("user")
+  subjectType String
+  subjectId   String
+  action      String
+  metadata    String?
+  ipAddress   String?
+  userAgent   String?
+  requestId   String?
+  createdAt   DateTime @default(now())
+
+  @@index([actorId])
+  @@index([subjectId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_event")
+}
+
+// ---------------------------------------------------------------------------
+// Webhook processing
+// ---------------------------------------------------------------------------
+
+model WebhookEvent {
+  id              String    @id @default(cuid())
+  provider        String
+  providerEventId String
+  eventType       String
+  payload         String
+  status          String    @default("pending")
+  attempts        Int       @default(0)
+  lastError       String?
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([provider, providerEventId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("webhook_event")
+}
+
+// ---------------------------------------------------------------------------
+// Uploads
+// ---------------------------------------------------------------------------
+
+model Asset {
+  id         String    @id @default(cuid())
+  ownerId    String
+  ownerType  String
+  fileName   String
+  fileType   String
+  fileSize   Int
+  storageKey String    @unique
+  purpose    String?
+  metadata   String?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([storageKey])
+  @@map("asset")
 }

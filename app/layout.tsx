@@ -1,6 +1,10 @@
+/**
+ * Root layout — fonts, global CSS, dark theme, and TRPCReactProvider wrapper.
+ */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Providers } from "./providers";
+import { TRPCReactProvider } from "@/lib/trpc/client";
+import { APP_NAME } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,11 +18,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "dastack",
-  description:
-    "An opinionated, production-ready Next.js starter - Bun, Prisma 7, Better Auth, tRPC, Tailwind 4, Biome.",
-  other: {
-    "apple-mobile-web-app-title": "dastack",
+  title: APP_NAME,
+  description: "The open-source starter stack",
+  appleWebApp: {
+    title: "dastack",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon1.png", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
   },
 };
 
@@ -28,11 +38,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <TRPCReactProvider>{children}</TRPCReactProvider>
       </body>
     </html>
   );

@@ -1,18 +1,14 @@
 /**
- * stripe:sync - Push plans from lib/plans.ts -> Stripe, then generate
- * lib/stripe-plans.generated.ts
+ * stripe:sync - Push plans from lib/plans.ts to Stripe, then generate
+ * lib/stripe-plans.generated.ts with account-specific price IDs.
  *
  * Usage:
- *   bun stripe:sync
+ *   pnpm stripe:sync
  *
  * Workflow:
  *   1. Edit lib/plans.ts - change names, prices, features, limits.
- *   2. Run `bun stripe:sync`.
+ *   2. Run `pnpm stripe:sync`.
  *   3. Restart the dev server. Done.
- *
- * The script will:
- *   - Create a Stripe Product + Monthly/Annual Price for each plan
- *   - Auto-generate lib/stripe-plans.generated.ts with real price IDs
  */
 
 import * as fs from "node:fs";
@@ -26,22 +22,62 @@ dotenv.config({ path: path.join(process.cwd(), ".env") });
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
 if (!stripeSecretKey) {
-  console.error("❌ STRIPE_SECRET_KEY not found in .env");
+  console.error("STRIPE_SECRET_KEY not found in .env");
   process.exit(1);
 }
 
 const stripe = new Stripe(stripeSecretKey);
 
+function buildGeneratedPlanBlock(plan: (typeof plans)[number], ids: {
+  monthlyPriceId: string;
+  annualPriceId?: string;
+}) {
+  const lines = [
+    "  {",
+    `    name: "${plan.slug}",`,
+    `    priceId: "${ids.monthlyPriceId}",`,
+  ];
+
+  if (ids.annualPriceId) {
+    lines.push(`    annualDiscountPriceId: "${ids.annualPriceId}",`);
+  }
+
+  lines.push("    limits: {");
+  lines.push(`      projects: ${plan.limits.projects},`);
+  lines.push(`      storage: ${plan.limits.storage},`);
+  lines.push("    },");
+
+  if (plan.trialDays) {
+    lines.push("    freeTrial: {");
+    lines.push(`      days: ${plan.trialDays},`);
+    lines.push("    },");
+  }
+
+  lines.push("  }");
+
+  return lines.join("\n");
+}
+
 async function sync() {
-  console.log("🚀 Syncing plans from lib/plans.ts -> Stripe...\n");
+  console.log("Syncing plans from lib/plans.ts -> Stripe...\n");
 
-  const results: Record<string, { monthly: string; yearly: string }> = {};
+  const paidPlans = plans.filter((plan) => plan.monthlyPrice > 0);
 
-  for (const plan of plans) {
-    console.log(`📦 Plan: ${plan.name}`);
+  if (paidPlans.length === 0) {
+    console.log("No paid plans found in lib/plans.ts. Nothing to sync.");
+    return;
+  }
 
-    // Stripe product name = plan display name (e.g. "Pro")
-    // Prepend your app name here if you like: `My App ${plan.name}`
+  const results = new Map<
+    string,
+    { monthlyPriceId: string; annualPriceId?: string }
+  >();
+
+  for (const plan of paidPlans) {
+    console.log(
+      `Plan: ${plan.name} ($${plan.monthlyPrice}/mo, $${plan.annualPrice}/yr)`,
+    );
+
     const product = await stripe.products.create({
       name: plan.name,
       description: plan.description,
@@ -52,80 +88,58 @@ async function sync() {
       unit_amount: plan.monthlyPrice * 100,
       currency: "usd",
       recurring: { interval: "month" },
-      nickname: `${plan.key}_monthly`,
+      nickname: `${plan.slug}_monthly`,
     });
 
-    const yearlyPrice = await stripe.prices.create({
-      product: product.id,
-      unit_amount: plan.annualPrice * 100,
-      currency: "usd",
-      recurring: { interval: "year" },
-      nickname: `${plan.key}_yearly`,
-    });
+    let annualPriceId: string | undefined;
 
-    results[plan.key] = {
-      monthly: monthlyPrice.id,
-      yearly: yearlyPrice.id,
-    };
+    if (plan.annualPrice > 0) {
+      const annualPrice = await stripe.prices.create({
+        product: product.id,
+        unit_amount: plan.annualPrice * 12 * 100,
+        currency: "usd",
+        recurring: { interval: "year" },
+        nickname: `${plan.slug}_annual`,
+      });
 
-    console.log(`   ✅ Product: ${product.id}`);
-    console.log(`   ✅ Monthly: ${monthlyPrice.id}`);
-    console.log(`   ✅ Yearly:  ${yearlyPrice.id}\n`);
-  }
-
-  // ── Build generated file contents ─────────────────────────────────────────
-  const plansCode = plans
-    .map((plan) => {
-      const ids = results[plan.key];
-      const limitsEntries = plan.limits
-        ? Object.entries(plan.limits)
-            .map(([k, v]) => `                  ${k}: ${v},`)
-            .join("\n")
-        : "";
-
-      return `  {
-    name: "${plan.key}",
-    priceId: "${ids.monthly}",
-    annualDiscountPriceId: "${ids.yearly}",${
-      plan.limits
-        ? `
-    limits: {
-${limitsEntries.replaceAll("                  ", "      ")}
-    },`
-        : ""
-    }${
-      plan.trialDays
-        ? `
-    freeTrial: {
-      days: ${plan.trialDays},
-    },`
-        : ""
+      annualPriceId = annualPrice.id;
+      console.log(`  Annual price: ${annualPrice.id}`);
     }
-  }`;
-    })
-    .join(",\n");
+
+    results.set(plan.slug, {
+      monthlyPriceId: monthlyPrice.id,
+      annualPriceId,
+    });
+
+    console.log(`  Product: ${product.id}`);
+    console.log(`  Monthly price: ${monthlyPrice.id}\n`);
+  }
 
   const generatedPath = path.join(
     process.cwd(),
     "lib",
     "stripe-plans.generated.ts",
   );
+
+  const generatedPlans = paidPlans
+    .map((plan) => buildGeneratedPlanBlock(plan, results.get(plan.slug)!))
+    .join(",\n");
+
   const generatedFile = `/**
- * Auto-generated Stripe plan IDs used by Better Auth Stripe plugin.
+ * Auto-generated Stripe plan IDs used by the Better Auth Stripe plugin.
  *
- * Source of truth for plan display/prices is \`lib/plans.ts\`.
+ * Source of truth for plan names, pricing, and limits is \`lib/plans.ts\`.
  * Regenerate this file with:
  *
- *   bun stripe:sync
+ *   pnpm stripe:sync
  */
 export interface StripeAuthPlan {
   name: string;
   priceId: string;
-  annualDiscountPriceId: string;
+  annualDiscountPriceId?: string;
   limits?: {
     projects?: number;
     storage?: number;
-    members?: number;
   };
   freeTrial?: {
     days: number;
@@ -133,21 +147,19 @@ export interface StripeAuthPlan {
 }
 
 export const stripePlans: StripeAuthPlan[] = [
-${plansCode},
+${generatedPlans},
 ];
 `;
 
   fs.writeFileSync(generatedPath, generatedFile);
-  console.log(
-    "✅ lib/stripe-plans.generated.ts updated with real Stripe Price IDs.",
-  );
 
+  console.log(`Updated ${path.relative(process.cwd(), generatedPath)}.`);
   console.log(
-    "\n✨ Done! Restart your dev server to pick up the new generated Stripe plan IDs.",
+    "Restart the dev server so Better Auth picks up the generated Stripe price IDs.",
   );
 }
 
-sync().catch((err) => {
-  console.error("❌ Sync failed:", err);
+sync().catch((error) => {
+  console.error("Stripe sync failed:", error);
   process.exit(1);
 });

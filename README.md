@@ -1,182 +1,75 @@
-# dastack
+# Next.js Starter
 
-**Build on structure.** An opinionated, production-ready Next.js template starter. Auth, data access, and a typed API surface, already wired. Clone it, wire up your own providers, and build your own product.
+A production-ready Next.js 16 starter with authentication, billing, file uploads, and optional organizations, admin, and Redis. Use this repo as a **GitHub template** to spin up a new project (click **Use this template** on GitHub; repo owners can enable **Settings → General → Template repository** so the button appears), or clone and customize it for your product.
 
-![dastack landing page](public/dastack.png)
+> **Before publishing your own version:** The codebase includes placeholder branding (e.g. "DaStack") in a few files and assets. See [Customization guide](DOCS/customization.md) for the exact locations to rename and the [pre-publish checklist](DOCS/customization.md#clean-publish-checklist).
 
----
+## What's included
 
-## 📚 Documentation
-
-**All setup and feature guides live in [DOCS/](./DOCS/).** Start there so you don’t get lost.
-
-| I want to… | Go to |
-|------------|--------|
-| Validate local requirements first | [DOCS/prerequisites.md](./DOCS/prerequisites.md) |
-| Get running | [DOCS/database.md](./DOCS/database.md) -> [DOCS/env.md](./DOCS/env.md) |
-| Validate first-time setup quickly | [DOCS/onboarding.md](./DOCS/onboarding.md) |
-| Understand architecture quickly | [DOCS/architecture.md](./DOCS/architecture.md) |
-| Set up auth & OAuth | [DOCS/auth.md](./DOCS/auth.md) -> [DOCS/oauth.md](./DOCS/oauth.md) |
-| Add Stripe | [DOCS/stripe.md](./DOCS/stripe.md) |
-| Customize branding/placeholders | [DOCS/customization.md](./DOCS/customization.md) |
-| Deploy (Docker + Dokploy default) | [DOCS/deploying.md](./DOCS/deploying.md) |
-| Follow production deploy runbook | [DOCS/deployment-runbook.md](./DOCS/deployment-runbook.md) |
-| Fix common setup/runtime issues | [DOCS/troubleshooting.md](./DOCS/troubleshooting.md) |
-| Explore optional integrations | [DOCS/optional.md](./DOCS/optional.md) |
-| Find a file or command | [DOCS/codebase.md](./DOCS/codebase.md) |
-
-**[DOCS/README.md](./DOCS/README.md)** - full index and recommended reading order.
-
----
-
-## Stack
-
-| Layer | Tech |
-|-------|------|
-| **Runtime** | [Bun](https://bun.sh) |
-| **Framework** | [Next.js 16](https://nextjs.org) (App Router) |
-| **React** | 19 |
-| **Database** | PostgreSQL |
-| **ORM** | [Prisma 7](https://prisma.io) + `@prisma/adapter-pg` |
-| **Auth** | [Better Auth](https://www.better-auth.com) - passkeys · magic link · Discord · Google · GitHub |
-| **Auth plugins** | Admin (custom roles) · Passkey · Stripe · i18n · Have I Been Pwned |
-| **Email** | [Resend](https://resend.com) (default, swappable) |
-| **API** | [tRPC](https://trpc.io) + [TanStack Query](https://tanstack.com/query) |
-| **Styling** | [Tailwind CSS 4](https://tailwindcss.com) |
-| **Validation** | [Zod](https://zod.dev) |
-| **Env** | [@t3-oss/env-nextjs](https://env.t3.gg) - build-time validation |
-| **Lint** | [Biome](https://biomejs.dev) |
-| **Deploy** | Docker, Vercel, Railway, Fly.io, Dokploy - your choice |
-
----
-
-## Template intent
-
-This repository is a **starter template**, not a finished SaaS product.
-
-- Keep the architecture and primitives (auth, billing, API, dashboard shell).
-- Replace branding, copy, links, legal pages, and pricing for your project.
-- Use [DOCS/customization.md](./DOCS/customization.md) for a release-ready checklist.
-
----
-
-## Who is this for?
-
-- **Indie makers** who want a solid auth + billing + dashboard baseline.
-- **Agencies/freelancers** shipping client apps quickly with room to customize.
-- **Startups** that need a pragmatic v1 foundation, not a locked framework.
-- **Hobby projects** that may begin landing-only and grow into full product flows.
-
----
-
-## Feature toggles (env only)
-
-Optional integrations are **off by default**. Add the right env vars and the UI turns them on - no code changes.
-
-| Feature | Env vars | What appears |
-|---------|----------|--------------|
-| Magic link email | `RESEND_API_KEY` | Email sign-in on `/auth` |
-| Discord OAuth | `DISCORD_CLIENT_ID` + `DISCORD_CLIENT_SECRET` | Discord button |
-| Google OAuth | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | Google button |
-| GitHub OAuth | `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | GitHub button |
-| Passkeys (WebAuthn) | none (enabled with core auth) | Passkey sign-in and passkey management |
-| Stripe | `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Pricing page, billing in dashboard |
-
-`/api/features` exposes boolean flags (no secrets) so the client knows what to render. See [DOCS/env.md](./DOCS/env.md) and [DOCS/auth.md](./DOCS/auth.md).
-
----
-
-## Usage modes
-
-Choose the mode that matches your project:
-
-- **SaaS mode (auth + Stripe):** set core auth env + Stripe env; use `/pricing` and `/dashboard/billing`.
-- **Auth-only mode:** set only core auth env; Stripe UI auto-hides.
-- **Landing/portfolio mode:** leave auth env unset; marketing pages still work while protected app areas stay off.
-
----
-
-## What can I strip out?
-
-- **Auth-only:** set only `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`; leave Stripe vars unset so pricing/billing stays hidden.
-- **Landing-only:** leave core auth vars unset and use only marketing/public routes.
-- **Stripe-free:** remove pricing/billing links and uninstall Stripe-related deps/scripts if your product does not need subscriptions.
-
-Detailed customization steps: [DOCS/customization.md](./DOCS/customization.md)
-
----
+- **Auth** — [Better Auth](https://www.better-auth.com/) with email/password, magic links, email OTP, passkeys, social login (Google, GitHub, Discord), guest sessions, and 2FA
+- **Database** — Prisma + PostgreSQL for auth, subscriptions, assets, audit events, usage, and webhooks
+- **Billing** — Stripe via Better Auth's subscription plugin (plans, checkout, portal, webhooks)
+- **Uploads** — [UploadThing](https://uploadthing.com/) with asset metadata in the database and auth-gated downloads
+- **Optional** — Organizations, admin dashboard, Redis cache/rate limiting (all feature-flagged)
+- **UI** — App Router, tRPC, TanStack Query, Tailwind CSS v4, Radix UI, shadcn-style components
 
 ## Quick start
 
-**Install Bun** (if needed):
+1. **Use this template** — Click "Use this template" on GitHub, or clone the repo.
+2. Install dependencies: `pnpm install`
+3. Copy `.env.example` to `.env` and set:
+   - `NEXT_PUBLIC_APP_URL` (e.g. `http://localhost:3000`)
+   - `DATABASE_URL`
+   - `BETTER_AUTH_URL` (same as app URL unless you use a separate auth host)
+   - `BETTER_AUTH_SECRET`
+4. Generate Prisma client: `pnpm exec prisma generate`
+5. Apply schema: `pnpm exec prisma db push`
+6. Start the app: `pnpm dev`
 
-- **Windows (PowerShell):** `powershell -c "irm bun.sh/install.ps1|iex"`
-- **Mac/Linux:** [bun.sh/docs/installation](https://bun.sh/docs/installation)
+To enable Stripe billing, add your Stripe keys, then run `pnpm stripe:sync` before testing paid plans.
 
-**Then:**
+## Documentation
 
-```bash
-git clone https://github.com/AltinKukaj/dastack.git
-cd dastack
+| Doc | Description |
+| --- | --- |
+| [Setup](DOCS/setup.md) | Prerequisites, first run, optional integrations |
+| [Environment variables](DOCS/environment.md) | Every env key, required vs optional |
+| [Auth](DOCS/auth.md) | Better Auth setup, flows, and customization |
+| [Billing](DOCS/billing.md) | Stripe setup, plans, webhooks, entitlements |
+| [Uploads and storage](DOCS/uploads.md) | UploadThing, asset records, download auth |
+| [Architecture](DOCS/architecture.md) | Stack, folder layout, request flow |
+| [Customization](DOCS/customization.md) | Rebranding, email, plans, feature trimming, publish checklist |
 
-bun install
-# Add .env (see DOCS/env.md) with DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL
+**Suggested order for new users:** Setup → Environment variables → Auth → Billing (if using Stripe) → Customization.
 
-bun db:generate
-bun db:push
-bun dev
-```
+## Scripts
 
-Open [http://localhost:3000](http://localhost:3000). Sign-in is at **`/auth`** (or `/sign-in` / `/sign-up`).
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Start the Next.js dev server |
+| `pnpm build` | Build for production |
+| `pnpm start` | Run the production build |
+| `pnpm lint` | Run ESLint |
+| `pnpm exec prisma generate` | Generate Prisma client |
+| `pnpm exec prisma db push` | Push schema to the database (no migrations) |
+| `pnpm stripe:sync` | Create Stripe products/prices from `lib/plans.ts` and regenerate `lib/stripe-plans.generated.ts` |
+| `pnpm stripe:poll` | Poll Stripe locally when not forwarding real webhooks |
 
-**Runtime note:** scripts are written for Bun, but `npm run` or `pnpm` equivalents work if you have a compatible Node runtime installed.
+## Deployment
 
----
+- **Docker** — A multi-stage `Dockerfile` and [GitHub Actions workflow](.github/workflows/docker-build.yml) build and push images to GitHub Container Registry. The image is built with placeholder env vars; **provide real env at runtime**. Run `prisma db push` or your migrations before or at container start if needed.
+- **Vercel / other hosts** — Set env vars, run Prisma generate in build, and run migrations or `db push` in a release step or separate job.
 
-## Project structure (high level)
+## Notes for template users
 
-```
-app/              # Next.js App Router (pages, api, layout)
-lib/              # Auth, db, env, email, tRPC client
-server/           # tRPC routers and context
-prisma/           # Schema
-proxy.ts          # Route protection (dashboard)
-scripts/          # stripe:sync, stripe:poll
-DOCS/             # All documentation - start there
-```
-
-Full map of features -> files: **[DOCS/codebase.md](./DOCS/codebase.md)**.
-
----
-
-## Optional integrations
-
-Need monitoring, analytics, or i18n guidance without adding defaults to the template?
-
-- [DOCS/optional.md](./DOCS/optional.md)
-
----
-
-## Testing
-
-Template tests are intentionally minimal and serve as examples.
-
-- Included coverage and test philosophy: [DOCS/testing.md](./DOCS/testing.md)
-- You should still add project-specific unit tests and end-to-end coverage for your own domain flows.
-
----
-
-## Contributing & Security
-
-- Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
-- Security policy: [SECURITY.md](./SECURITY.md)
-
----
+- **Legal pages** — `/terms` and `/privacy` are placeholders. Replace their content before launch.
+- **Billing** — The app uses Stripe only. Unused `POLAR_*` env definitions remain in `lib/env.ts`; you can remove them if you do not plan to add Polar.
+- **Email** — Default transport is Resend; the integration is isolated in `lib/email.ts` so you can swap providers easily.
+- **Stripe plans** — `lib/stripe-plans.generated.ts` is generated for a specific Stripe account. Run `pnpm stripe:sync` for your own account.
+- **Optional features** — Billing, uploads, organizations, admin, and Redis are gated by env; leave keys unset to ship a smaller footprint.
+- **Dependabot** — `.github/dependabot.yml` is included for npm, GitHub Actions, and Docker; template users get dependency update PRs by default.
+- **Security** — See [SECURITY.md](SECURITY.md) for reporting vulnerabilities and best practices when using this template.
 
 ## License
 
 MIT
-
----
-
-Made by [dagrate](https://github.com/AltinKukaj)

@@ -1,52 +1,61 @@
 /**
- * poll-stripe - Local dev replacement for `stripe listen`
+ * stripe:poll — Local dev replacement for `stripe listen`
  *
  * Polls Stripe every 5 seconds for completed checkout sessions and
- * updates the local database subscription status accordingly.
+ * updates local subscription records from "incomplete" to "active".
  *
  * Usage:
- *   bun stripe:poll
+ *   pnpm stripe:poll
  *
- * Keep this running in a separate terminal alongside `bun dev`.
- * Only needed for local development - production uses real webhooks.
+ * Keep this running in a separate terminal alongside `pnpm dev`.
+ * Only needed for local development — production uses real webhooks.
  */
 
 import * as path from "node:path";
 import * as dotenv from "dotenv";
 import Stripe from "stripe";
-import { prisma } from "../lib/db";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../generated/prisma/client.js";
+import pg from "pg";
 
 dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 const stripeKey = process.env.STRIPE_SECRET_KEY;
+const databaseUrl = process.env.DATABASE_URL;
+
 if (!stripeKey) {
-  console.error("❌ STRIPE_SECRET_KEY not set");
+  console.error("❌ STRIPE_SECRET_KEY not set in .env");
+  process.exit(1);
+}
+
+if (!databaseUrl) {
+  console.error("❌ DATABASE_URL not set in .env");
   process.exit(1);
 }
 
 const stripe = new Stripe(stripeKey);
+const pool = new pg.Pool({ connectionString: databaseUrl });
+const adapter = new PrismaPg(pool);
+const db = new PrismaClient({ adapter });
+
 const POLL_INTERVAL = 5000;
 const seen = new Set<string>();
 
 async function poll() {
   try {
-    const sessions = await stripe.checkout.sessions.list({
-      limit: 10,
-    });
+    const sessions = await stripe.checkout.sessions.list({ limit: 10 });
 
     for (const session of sessions.data) {
       if (seen.has(session.id)) continue;
       if (session.payment_status !== "paid") continue;
       seen.add(session.id);
 
-      // Get subscription ID from the session
       const subId =
         typeof session.subscription === "string"
           ? session.subscription
           : session.subscription?.id;
       if (!subId) continue;
 
-      // Fetch the full subscription separately
       const sub = await stripe.subscriptions.retrieve(subId);
 
       const customerId =
@@ -55,7 +64,6 @@ async function poll() {
           : session.customer?.id;
       if (!customerId) continue;
 
-      // Safely get period dates from the raw JSON
       const raw = JSON.parse(JSON.stringify(sub));
       const now = new Date();
       const periodStart = raw.current_period_start
@@ -65,15 +73,10 @@ async function poll() {
         ? new Date(raw.current_period_end * 1000)
         : new Date(now.getTime() + 30 * 86400000);
 
-      // Look up the user by their Stripe customer ID
-      const db = prisma;
-      if (!db) {
-        console.error("❌ Prisma client not available (DATABASE_URL not set).");
-        continue;
-      }
       const user = await db.user.findFirst({
         where: { stripeCustomerId: customerId },
       });
+
       if (!user) {
         console.log(`⚠️  No user found for customer ${customerId}, skipping.`);
         continue;
@@ -95,7 +98,7 @@ async function poll() {
 
       if (updated.count > 0) {
         console.log(
-          `✅ [${now.toLocaleTimeString()}] Activated ${updated.count} sub(s) -> ${sub.status} (${sub.id})`,
+          `✅ [${now.toLocaleTimeString()}] Activated ${updated.count} sub(s) → ${sub.status} (${sub.id})`,
         );
       }
     }

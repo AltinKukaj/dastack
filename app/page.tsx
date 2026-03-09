@@ -1,29 +1,23 @@
+/** Landing page — single-screen hero with specs and navigation. */
 import Link from "next/link";
-import { getFeatureFlags } from "@/lib/features";
-import { HomeAuthLink } from "./components/home-auth-link";
-
-export const dynamic = "force-dynamic";
-
-const stack = [
-  { name: "Next.js", href: "https://nextjs.org" },
-  { name: "React", href: "https://react.dev" },
-  { name: "Bun", href: "https://bun.sh" },
-  { name: "Prisma", href: "https://prisma.io" },
-  { name: "Better Auth", href: "https://www.better-auth.com" },
-  { name: "tRPC", href: "https://trpc.io" },
-  { name: "Tailwind", href: "https://tailwindcss.com" },
-  { name: "Zustand", href: "https://zustand.docs.pmnd.rs" },
-  { name: "Biome", href: "https://biomejs.dev" },
-  { name: "Zod", href: "https://zod.dev" },
-];
+import { APP_NAME } from "@/lib/config";
 
 const specs = [
   {
     label: "Auth",
     value: "Ready",
-    detail: "Sessions, providers, protected routes",
+    detail: "Sessions, providers, passkeys, 2FA",
   },
-  { label: "API", value: "Typed", detail: "tRPC, Zod, end-to-end safety" },
+  {
+    label: "Payments",
+    value: "Optional",
+    detail: "Stripe auto-configured",
+  },
+  {
+    label: "Database",
+    value: "Prisma",
+    detail: "PostgreSQL, typed schema, migrations",
+  },
   {
     label: "Stack",
     value: "Lean",
@@ -31,168 +25,161 @@ const specs = [
   },
 ];
 
-export default function Home() {
-  const flags = getFeatureFlags();
+const commands = ["pnpm install", "pnpm dlx prisma generate", "pnpm dev"];
 
+const stack = [
+  { label: "Next.js", href: "https://nextjs.org" },
+  { label: "Better Auth", href: "https://better-auth.com" },
+  { label: "Prisma", href: "https://prisma.io" },
+  { label: "Stripe", href: "https://stripe.com" },
+  { label: "Tailwind", href: "https://tailwindcss.com" },
+  { label: "shadcn/ui", href: "https://ui.shadcn.com" },
+];
+
+export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#09090b] font-[family-name:var(--font-geist-sans)] text-white">
-      <header className="animate-fade-in fixed top-0 z-50 w-full bg-[#09090b]/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <span className="font-[family-name:var(--font-geist-mono)] text-[13px] tracking-tight">
-            dastack
-          </span>
-          <nav className="flex items-center gap-5 sm:gap-6">
-            <a
-              href="https://github.com/AltinKukaj/dastack"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[13px] text-neutral-600 transition-colors hover:text-white"
-            >
-              GitHub
-            </a>
-            {flags.stripe && (
-              <Link
-                href="/pricing"
-                className="text-[13px] text-neutral-600 transition-colors hover:text-white"
-              >
-                Pricing
-              </Link>
-            )}
-            <a
-              href="https://github.com/AltinKukaj/dastack#readme"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden text-[13px] text-neutral-600 transition-colors hover:text-white sm:inline"
-            >
-              Docs
-            </a>
-            <HomeAuthLink initialVisible={flags.auth} />
-          </nav>
-        </div>
+    <div className="h-dvh w-full bg-[#0a0a0a] text-white font-sans overflow-hidden flex flex-col">
+      {/* Nav */}
+      <header className="animate-fade-in flex items-center justify-between px-5 py-4 sm:px-8 lg:px-12 shrink-0">
+        <span className="text-[13px] font-semibold tracking-tight select-none">
+          {APP_NAME}
+        </span>
+        <nav className="flex items-center gap-6">
+          <Link
+            href="/terms"
+            className="text-[11px] font-mono text-zinc-700 hover:text-zinc-400 transition-colors duration-150 hidden sm:inline"
+          >
+            Terms
+          </Link>
+          <Link
+            href="/pricing"
+            className="text-[11px] font-mono text-zinc-600 hover:text-white transition-colors duration-150 hidden sm:inline"
+          >
+            Pricing
+          </Link>
+          <Link
+            href="/login"
+            className="text-[11px] font-mono text-zinc-500 hover:text-white transition-colors duration-150"
+          >
+            Sign in
+          </Link>
+        </nav>
       </header>
 
-      <main className="flex flex-1 items-center px-6 pt-24 pb-12 lg:pt-0 lg:pb-0">
-        <div className="mx-auto grid w-full max-w-6xl gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-20">
-          <div className="animate-slide-up flex flex-col justify-center">
-            <p className="font-[family-name:var(--font-geist-mono)] text-[11px] tracking-[0.2em] text-neutral-600">
-              NEXT.JS STARTER
+      {/* Main content — fills remaining viewport */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+        {/* Left: headline */}
+        <div className="flex flex-col justify-center flex-1 px-5 sm:px-8 lg:px-12 py-6 lg:py-0">
+          <div className="max-w-lg">
+            <p className="animate-fade-in text-[11px] text-zinc-600">
+              Open source starter stack
             </p>
-            <h1 className="mt-5 font-[family-name:var(--font-geist-mono)] text-[clamp(2.25rem,5.5vw,4.25rem)] leading-[1.08] tracking-tight">
-              Build on
+
+            <h1 className="animate-fade-in mt-5 text-[clamp(2.5rem,8vw,5rem)] font-semibold leading-[0.9] tracking-[-0.04em] text-white">
+              Ship
               <br />
-              structure.
+              in minutes.
             </h1>
-            <p className="animate-slide-up-delayed mt-6 max-w-md text-[15px] leading-7 text-neutral-400">
-              Auth, data access, and a typed API surface, already wired. Start
-              with sensible defaults and replace the product layer with your
-              own.
+
+            <p className="animate-fade-in mt-6 text-[13px] text-zinc-500 max-w-xs leading-relaxed">
+              Auth, payments, database. Everything you need to launch,
+              nothing you need to rip out.
             </p>
-            <div className="animate-slide-up-delayed-2 mt-8 flex flex-wrap gap-3">
-              {flags.auth ? (
-                <Link
-                  href="/auth"
-                  className="rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-neutral-200"
-                >
-                  Get started
-                </Link>
-              ) : (
-                <a
-                  href="https://github.com/AltinKukaj/dastack"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-neutral-200"
-                >
-                  Get started
-                </a>
-              )}
-              <a
-                href="https://github.com/AltinKukaj/dastack"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg border border-neutral-800 px-5 py-2.5 text-sm text-neutral-500 transition hover:border-neutral-700 hover:text-white"
-              >
-                GitHub
-              </a>
+
+            <div className="animate-fade-in mt-8 flex flex-wrap gap-3">
+              <Link href="/login?tab=sign-up" className="btn-primary text-[13px]">
+                Get started
+              </Link>
+              <Link href="/pricing" className="btn-outline text-[13px]">
+                View plans
+              </Link>
             </div>
           </div>
+        </div>
 
-          <div className="flex flex-col justify-center">
-            <div>
-              {specs.map((spec, i) => (
+        {/* Right: specs + terminal */}
+        <div className="flex flex-col justify-center flex-1 px-5 pb-6 sm:px-8 lg:px-0 lg:pr-12 lg:pb-0">
+          <div className="max-w-md lg:ml-auto">
+            {/* Specs */}
+            <div className="space-y-0">
+              {specs.map((spec) => (
                 <div
                   key={spec.label}
-                  className="animate-slide-up flex items-baseline justify-between border-b border-neutral-800/50 py-4 first:pt-0"
-                  style={{ animationDelay: `${250 + i * 100}ms` }}
+                  className="animate-fade-in flex items-baseline justify-between border-b border-white/[0.06] py-3"
                 >
                   <div>
-                    <span className="font-[family-name:var(--font-geist-mono)] text-sm text-neutral-500">
+                    <span className="font-mono text-[12px] text-zinc-400">
                       {spec.label}
                     </span>
-                    <p className="mt-0.5 text-[12px] text-neutral-700">
+                    <p className="mt-0.5 text-[10px] text-zinc-700 leading-snug">
                       {spec.detail}
                     </p>
                   </div>
-                  <span className="font-[family-name:var(--font-geist-mono)] text-sm text-white">
+                  <span className="font-mono text-[12px] text-white">
                     {spec.value}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div
-              className="animate-slide-up mt-8 font-[family-name:var(--font-geist-mono)] text-[13px] leading-7 text-neutral-700"
-              style={{ animationDelay: "550ms" }}
-            >
-              <p>
-                <span className="text-neutral-800">$</span> bun install
-              </p>
-              <p>
-                <span className="text-neutral-800">$</span> bun db:generate
-              </p>
-              <p>
-                <span className="text-neutral-800">$</span> bun dev
-              </p>
+            {/* Terminal */}
+            <div className="animate-fade-in mt-4 rounded-md border border-white/[0.06] bg-white/[0.02] p-3.5">
+              <div className="flex gap-1.5 mb-2.5">
+                <span className="size-1.5 rounded-full bg-zinc-700" />
+                <span className="size-1.5 rounded-full bg-zinc-700" />
+                <span className="size-1.5 rounded-full bg-zinc-700" />
+              </div>
+              {commands.map((cmd) => (
+                <p
+                  key={cmd}
+                  className="font-mono text-[11px] text-zinc-500 leading-relaxed"
+                >
+                  <span className="text-zinc-600">$</span> {cmd}
+                </p>
+              ))}
+            </div>
+
+            {/* Stack links */}
+            <div className="animate-fade-in mt-4 flex flex-wrap gap-1.5">
+              {stack.map((item) => (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-white/[0.06] px-2.5 py-0.5 rounded-md text-[10px] font-mono text-zinc-600 transition-colors duration-150 hover:border-white/[0.12] hover:text-zinc-300"
+                >
+                  {item.label}
+                </a>
+              ))}
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
-      <footer className="border-t border-neutral-800/30 px-6 pb-8 pt-5">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-            {stack.map((item, i) => (
-              <a
-                key={item.name}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="animate-fade-in text-[12px] text-neutral-700 transition-colors hover:text-white"
-                style={{ animationDelay: `${i * 40}ms` }}
-              >
-                {item.name}
-              </a>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-5 text-[11px] text-neutral-700">
-            {flags.stripe && (
-              <Link
-                href="/pricing"
-                className="transition-colors hover:text-white"
-              >
-                Pricing
-              </Link>
-            )}
-            <Link href="/terms" className="transition-colors hover:text-white">
-              Terms
-            </Link>
-            <Link
-              href="/privacy"
-              className="transition-colors hover:text-white"
-            >
-              Privacy
-            </Link>
-          </div>
+      {/* Footer bar */}
+      <footer className="animate-fade-in shrink-0 flex items-center justify-between px-5 sm:px-8 lg:px-12 py-3 border-t border-white/[0.04]">
+        <div className="flex items-center gap-5">
+          <Link
+            href="/login?tab=sign-up"
+            className="text-[11px] text-zinc-600 hover:text-zinc-300 transition-colors duration-150"
+          >
+            Get started
+          </Link>
+          <Link
+            href="/terms"
+            className="text-[11px] text-zinc-700 hover:text-zinc-400 transition-colors duration-150 hidden sm:inline"
+          >
+            Terms
+          </Link>
+          <Link
+            href="/privacy"
+            className="text-[11px] text-zinc-700 hover:text-zinc-400 transition-colors duration-150 hidden sm:inline"
+          >
+            Privacy
+          </Link>
         </div>
+        <span className="text-[10px] font-mono text-zinc-800">v0.1.0</span>
       </footer>
     </div>
   );

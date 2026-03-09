@@ -1,208 +1,172 @@
+/** Password reset page — validates a token from the URL and lets the user set a new password. */
 "use client";
 
+import { Suspense, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
-export default function ResetPasswordPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#09090b]">
-          <span className="size-5 animate-spin rounded-full border-2 border-neutral-800 border-t-white" />
-        </div>
-      }
-    >
-      <ResetPasswordContent />
-    </Suspense>
-  );
-}
+type ResultLike = {
+  error?: {
+    message?: string;
+  } | null;
+};
 
-function ResetPasswordContent() {
+function ResetPasswordForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const errorCode = searchParams.get("error");
 
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  if (!token) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#09090b] px-4 font-[family-name:var(--font-geist-sans)]">
-        <div className="w-full max-w-sm text-center">
-          <p className="font-[family-name:var(--font-geist-mono)] text-sm text-white">
-            Invalid reset link
-          </p>
-          <p className="mt-1.5 text-[13px] text-neutral-600">
-            This password reset link is invalid or has expired.
-          </p>
-          <Link
-            href="/forgot-password"
-            className="mt-5 inline-block rounded-lg border border-neutral-800/60 px-4 py-2 text-xs text-neutral-500 transition hover:text-white"
-          >
-            Request a new link
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const pageError = useMemo(() => {
+    if (errorCode === "INVALID_TOKEN") {
+      return "This reset link is invalid or has expired. Request a new one from the login screen.";
+    }
 
-  const handleReset = async () => {
-    if (!newPassword || !confirmPassword) return;
+    return "";
+  }, [errorCode]);
 
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.");
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!token) {
+      setError("Missing reset token. Request a new password reset email.");
       return;
     }
+
+    const form = new FormData(event.currentTarget);
+    const newPassword = String(form.get("newPassword") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
 
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError("Use at least 8 characters for your new password.");
       return;
     }
 
-    setError(null);
-    setLoading(true);
-
-    try {
-      const result = await authClient.resetPassword({
-        newPassword,
-        token,
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message ?? "Failed to reset password.");
-      }
-
-      setSuccess(true);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
+    if (newPassword !== confirmPassword) {
+      setError("Your passwords do not match.");
+      return;
     }
+
+    setLoading(true);
+    setError("");
+
+    const result = (await authClient.resetPassword({
+      token,
+      newPassword,
+    })) as ResultLike;
+
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error.message ?? "We could not reset your password.");
+      return;
+    }
+
+    setSuccess(true);
+    router.push("/login?reset=success");
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#09090b] px-4 font-[family-name:var(--font-geist-sans)]">
-      <div className="w-full max-w-sm">
-        <div className="animate-fade-in mb-10 text-center">
-          <Link
-            href="/"
-            className="font-[family-name:var(--font-geist-mono)] text-[13px] tracking-tight text-white"
-          >
-            dastack
-          </Link>
-        </div>
-
-        <div className="animate-slide-up">
-          {success ? (
-            <div className="flex flex-col items-center gap-5 py-4 text-center">
-              <div className="flex size-10 items-center justify-center rounded border border-neutral-800">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  className="size-5 text-white"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="font-[family-name:var(--font-geist-mono)] text-sm text-white">
-                  Password updated
-                </p>
-                <p className="mt-1.5 text-[13px] text-neutral-500">
-                  You can now sign in with your new password.
-                </p>
-              </div>
-              <Link
-                href="/sign-in"
-                className="rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition hover:bg-neutral-200"
-              >
-                Sign in
-              </Link>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-5">
-              <div>
-                <h1 className="font-[family-name:var(--font-geist-mono)] text-xl tracking-tight text-white">
-                  Choose a new password
-                </h1>
-                <p className="mt-1.5 text-[13px] text-neutral-600">
-                  Enter a strong password you haven&apos;t used before.
-                </p>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="new-password"
-                  className="mb-1.5 block text-xs text-neutral-600"
-                >
-                  New password
-                </label>
-                <input
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="At least 8 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full border-b border-neutral-800 bg-transparent px-0 py-2.5 text-sm text-white placeholder:text-neutral-700 outline-none transition focus:border-neutral-600"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="confirm-new-password"
-                  className="mb-1.5 block text-xs text-neutral-600"
-                >
-                  Confirm new password
-                </label>
-                <input
-                  id="confirm-new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="Repeat your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleReset()}
-                  className="w-full border-b border-neutral-800 bg-transparent px-0 py-2.5 text-sm text-white placeholder:text-neutral-700 outline-none transition focus:border-neutral-600"
-                />
-              </div>
-
-              <button
-                type="button"
-                disabled={loading || !newPassword || !confirmPassword}
-                onClick={handleReset}
-                className="w-full rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="size-4 animate-spin rounded-full border-2 border-neutral-400 border-t-neutral-950" />
-                    Resetting...
-                  </span>
-                ) : (
-                  "Reset password"
-                )}
-              </button>
-
-              {error && (
-                <p className="border-l-2 border-red-800 pl-3 text-sm text-red-300">
-                  {error}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+    <div className="w-full max-w-md rounded-md border border-white/8 bg-white/[0.02] p-6 sm:p-8">
+      <div className="mb-8">
+        <Link
+          href="/login"
+          className="text-[13px] text-zinc-600 hover:text-zinc-300 transition-colors duration-200 font-mono"
+        >
+          Back to login
+        </Link>
+        <h1 className="mt-5 text-xl font-semibold text-white">
+          Reset password
+        </h1>
+        <p className="mt-3 text-sm text-zinc-500 leading-relaxed">
+          Choose a new password for your account, then sign in again on your devices.
+        </p>
       </div>
+
+      {pageError && (
+        <p className="mb-4 rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-zinc-300">
+          {pageError}
+        </p>
+      )}
+
+      {!pageError && !success && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="new-password"
+              className="mb-2 block text-[13px] text-zinc-500 font-mono"
+            >
+              New password
+            </label>
+            <input
+              id="new-password"
+              name="newPassword"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              disabled={loading}
+              className="w-full rounded-md border border-zinc-800/80 bg-transparent px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition-colors duration-200 focus:border-white/40 disabled:opacity-40"
+              placeholder="Min. 8 characters"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="confirm-password"
+              className="mb-2 block text-[13px] text-zinc-500 font-mono"
+            >
+              Confirm password
+            </label>
+            <input
+              id="confirm-password"
+              name="confirmPassword"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              disabled={loading}
+              className="w-full rounded-md border border-zinc-800/80 bg-transparent px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition-colors duration-200 focus:border-white/40 disabled:opacity-40"
+              placeholder="Repeat your new password"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full btn-primary flex items-center justify-center gap-2"
+          >
+            {loading ? "Resetting..." : "Save new password"}
+          </button>
+        </form>
+      )}
+
+      {error && (
+        <p className="mt-4 rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-center text-sm text-zinc-300">
+          {error}
+        </p>
+      )}
+
+      {success && (
+        <p className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-zinc-300">
+          Your password has been updated. Redirecting you back to sign in.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <div className="min-h-dvh bg-[#0a0a0a] text-zinc-100 flex items-center justify-center px-6 py-10">
+      <Suspense>
+        <ResetPasswordForm />
+      </Suspense>
     </div>
   );
 }

@@ -30,13 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (local secrets)
-.env*
-!.env.example
-
-# avoid copied env files from Next standalone output
-.next/standalone/.env
-.next/standalone/.env.*
+# env files (can opt-in for committing if needed)
+.env
 
 # vercel
 .vercel
@@ -45,6 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma
 /generated
 
-dastack-7468948d2571645a5aded90ee621f088c14235f8
+.claude

@@ -1,21 +1,28 @@
+import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
-import { type NextRequest, NextResponse } from "next/server";
 
-/**
- * Optimistic auth gate for /dashboard/* routes.
- * The authoritative session check lives in app/dashboard/layout.tsx.
- */
-export function proxy(request: NextRequest) {
-  if (!getSessionCookie(request)) {
-    const signInUrl = new URL("/sign-in", request.url);
-    const callbackPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
-    signInUrl.searchParams.set("callbackUrl", callbackPath);
-    return NextResponse.redirect(signInUrl);
+const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
+const PROTECTED_PREFIX = ["/dashboard", "/settings", "/admin"];
+
+export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const session = getSessionCookie(request);
+
+  if (session && AUTH_PAGES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (!session && PROTECTED_PREFIX.some((p) => pathname.startsWith(p))) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+  ],
 };

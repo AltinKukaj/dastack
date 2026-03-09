@@ -1,117 +1,144 @@
-/**
- * ─── Plans Config ────────────────────────────────────────────────────────────
- *
- * This is the SINGLE SOURCE OF TRUTH for your subscription plans.
- *
- * Edit this file to change plan names, prices, features, limits, or trial days.
- * Then run:
- *
- *   bun stripe:sync
- *
- * The script will create the products on Stripe and generate
- * lib/stripe-plans.generated.ts with the real Price IDs automatically.
- * No manual copy-pasting needed.
- *
- * ─────────────────────────────────────────────────────────────────────────────
- */
+import {
+  stripePlans as generatedStripePlans,
+  type StripeAuthPlan,
+} from "@/lib/stripe-plans.generated";
 
-export interface Plan {
-  /** Internal key - must match the plan `name` in generated Stripe auth plans */
-  key: string;
-  /** Display name shown to users */
+// ---------------------------------------------------------------------------
+// Plan & billing configuration
+//
+// This is the single source of truth for plan metadata, pricing UI, and
+// entitlement limits. Account-specific Stripe price IDs are generated into
+// `lib/stripe-plans.generated.ts` by `pnpm stripe:sync`.
+// ---------------------------------------------------------------------------
+
+export type Plan = {
   name: string;
-  /** Monthly price in USD (whole dollars) */
+  slug: string;
   monthlyPrice: number;
-  /** Annual price in USD (whole dollars) */
   annualPrice: number;
-  /** Short description shown on the pricing card */
   description: string;
-  /** Feature list shown on the pricing card */
   features: string[];
-  /** CTA button text */
   cta: string;
-  /** Highlight this card visually (e.g. "Most popular") */
-  highlighted?: boolean;
-  /** Optional badge shown above the card */
+  highlighted: boolean;
   badge?: string;
-  /** Free trial days (applies to this plan only) */
+  limits: { projects: number; storage: number };
   trialDays?: number;
-  /** Resource limits - used by Better Auth Stripe plugin */
-  limits?: {
-    projects?: number; // -1 = unlimited
-    storage?: number; // GB, -1 = unlimited
-    members?: number; // -1 = unlimited
-  };
+};
+
+function isStripePriceIdConfigured(priceId?: string): priceId is string {
+  return typeof priceId === "string" && /^price_[A-Za-z0-9]+$/.test(priceId);
+}
+
+function isStripePlanConfigured(
+  generatedPlan: StripeAuthPlan | undefined,
+  plan: Plan,
+): generatedPlan is StripeAuthPlan {
+  if (!generatedPlan || !isStripePriceIdConfigured(generatedPlan.priceId)) {
+    return false;
+  }
+
+  if (
+    plan.annualPrice > 0 &&
+    !isStripePriceIdConfigured(generatedPlan.annualDiscountPriceId)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export const plans: Plan[] = [
   {
-    key: "starter",
-    name: "Starter",
-    monthlyPrice: 10,
-    annualPrice: 100,
-    description: "For individuals and small side projects.",
+    name: "Free",
+    slug: "free",
+    monthlyPrice: 0,
+    annualPrice: 0,
+    description: "For side projects and experiments.",
     features: [
-      "3 projects",
-      "5 GB storage",
-      "1 team member",
+      "1 project",
+      "1 GB storage",
       "Community support",
       "Basic analytics",
     ],
     cta: "Get started",
     highlighted: false,
-    limits: {
-      projects: 3,
-      storage: 5,
-      members: 1,
-    },
+    limits: { projects: 1, storage: 1 },
   },
   {
-    key: "pro",
     name: "Pro",
-    monthlyPrice: 29,
-    annualPrice: 290,
-    description: "For growing teams that need more power.",
-    badge: "Most popular",
-    trialDays: 14,
+    slug: "pro",
+    monthlyPrice: 12,
+    annualPrice: 10,
+    description: "For developers shipping real products.",
     features: [
       "20 projects",
       "50 GB storage",
-      "5 team members",
       "Priority support",
       "Advanced analytics",
-      "Custom integrations",
+      "Custom domains",
       "14-day free trial",
     ],
     cta: "Start free trial",
     highlighted: true,
-    limits: {
-      projects: 20,
-      storage: 50,
-      members: 5,
-    },
+    badge: "Most popular",
+    limits: { projects: 20, storage: 50 },
+    trialDays: 14,
   },
   {
-    key: "enterprise",
-    name: "Enterprise",
-    monthlyPrice: 99,
-    annualPrice: 990,
-    description: "For organizations that need unlimited scale.",
+    name: "Team",
+    slug: "team",
+    monthlyPrice: 49,
+    annualPrice: 40,
+    description: "For teams building at scale.",
     features: [
-      "Unlimited projects",
-      "Unlimited storage",
-      "Unlimited members",
+      "100 projects",
+      "500 GB storage",
       "Dedicated support",
-      "Advanced analytics",
+      "Full analytics suite",
+      "Custom domains",
+      "Team management",
       "SSO & audit logs",
-      "Custom contracts",
     ],
-    cta: "Contact sales",
+    cta: "Contact us",
     highlighted: false,
-    limits: {
-      projects: -1,
-      storage: -1,
-      members: -1,
-    },
+    limits: { projects: 100, storage: 500 },
   },
 ];
+
+function getPaidPlans() {
+  return plans.filter((plan) => plan.monthlyPrice > 0);
+}
+
+function getGeneratedStripePlan(slug: string) {
+  return generatedStripePlans.find((plan) => plan.name === slug);
+}
+
+export function getPlanBySlug(slug: string): Plan | undefined {
+  return plans.find((plan) => plan.slug === slug);
+}
+
+export function hasConfiguredStripePlans() {
+  return getPaidPlans().every((plan) =>
+    isStripePlanConfigured(getGeneratedStripePlan(plan.slug), plan),
+  );
+}
+
+export function getStripePlans() {
+  return getPaidPlans().flatMap((plan) => {
+    const generatedPlan = getGeneratedStripePlan(plan.slug);
+
+    if (!isStripePlanConfigured(generatedPlan, plan)) {
+      return [];
+    }
+
+    return [
+      {
+        name: plan.slug,
+        priceId: generatedPlan.priceId,
+        annualDiscountPriceId: generatedPlan.annualDiscountPriceId,
+        limits: plan.limits,
+        ...(plan.trialDays ? { freeTrial: { days: plan.trialDays } } : {}),
+      },
+    ];
+  });
+}

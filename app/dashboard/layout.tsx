@@ -1,16 +1,26 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+/** Dashboard layout — auth-gated wrapper that passes session data and feature flags to the shell. */
+import { requireAuth } from "@/lib/auth-server";
+import { isPaymentsEnabled, isOrganizationsEnabled, isUploadsEnabled } from "@/lib/features";
+import { DashboardShell } from "./dashboard-shell";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  if (!auth) redirect("/");
+  const session = await requireAuth();
 
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/auth?callbackUrl=/dashboard");
-
-  return <>{children}</>;
+  return (
+    <DashboardShell
+      userName={session.user.name ?? "User"}
+      userEmail={session.user.email}
+      emailVerified={session.user.emailVerified}
+      userImage={session.user.image ?? undefined}
+      paymentsEnabled={isPaymentsEnabled()}
+      organizationsEnabled={isOrganizationsEnabled()}
+      uploadsEnabled={isUploadsEnabled()}
+    >
+      {children}
+    </DashboardShell>
+  );
 }

@@ -1,905 +1,200 @@
+/** Profile settings — display name update, email verification, and email change. */
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { authClient, useSession } from "@/lib/auth-client";
-import { getClientFeatureFlags } from "@/lib/feature-flags-client";
-import { hasPermission, parseUserRoles } from "@/lib/permissions";
-import { DashboardAvatar } from "../components/dashboard-avatar";
-import { DashboardShell } from "../components/dashboard-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { extractError, formatError, Banner } from "@/app/dashboard/_lib/settings-helpers";
 
-interface SessionInfo {
-  id: string;
-  token: string;
-  userAgent?: string | null;
-  ipAddress?: string | null;
-  createdAt: string | Date;
-  expiresAt: string | Date;
-}
+export default function ProfilePage() {
+  const router = useRouter();
+  const { data: sessionData, isPending, refetch } = useSession();
 
-interface PasskeyInfo {
-  id: string;
-  name?: string | null;
-  createdAt?: string | Date | null;
-}
+  const user = sessionData?.user as {
+    name?: string | null;
+    email?: string | null;
+    emailVerified?: boolean;
+  } | undefined;
 
-function parseUA(ua: string): string {
-  if (ua.includes("Chrome")) return "Chrome";
-  if (ua.includes("Firefox")) return "Firefox";
-  if (ua.includes("Safari")) return "Safari";
-  if (ua.includes("Edge")) return "Edge";
-  return ua.slice(0, 40);
-}
-
-export default function SettingsPage() {
-  const { data: session, isPending } = useSession();
-  const [stripeEnabled, setStripeEnabled] = useState(false);
-
-  // Profile
-  const [name, setName] = useState("");
-  const [usernameVal, setUsernameVal] = useState("");
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [profileMsg, setProfileMsg] = useState<string | null>(null);
-
-  // Password
-  const [currentPw, setCurrentPw] = useState("");
-  const [newPw, setNewPw] = useState("");
-  const [confirmPw, setConfirmPw] = useState("");
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwMsg, setPwMsg] = useState<{
-    type: "ok" | "err";
-    text: string;
-  } | null>(null);
-
-  // 2FA
-  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
-  const [twoFAStep, setTwoFAStep] = useState<
-    "idle" | "password" | "qr" | "backup"
-  >("idle");
-  const [twoFAPassword, setTwoFAPassword] = useState("");
-  const [totpURI, setTotpURI] = useState<string | null>(null);
-  const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  const [verifyCode, setVerifyCode] = useState("");
-  const [twoFALoading, setTwoFALoading] = useState(false);
-  const [twoFAError, setTwoFAError] = useState<string | null>(null);
-
-  // Sessions
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
-  const [sessionMsg, setSessionMsg] = useState<{
-    type: "ok" | "err";
-    text: string;
-  } | null>(null);
-
-  // Passkeys
-  const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
-  const [passkeyName, setPasskeyName] = useState("");
-  const [passkeysLoading, setPasskeysLoading] = useState(true);
-  const [passkeyActionLoading, setPasskeyActionLoading] = useState<
-    string | null
-  >(null);
-  const [passkeyMsg, setPasskeyMsg] = useState<{
-    type: "ok" | "err";
-    text: string;
-  } | null>(null);
-
-  // Danger zone
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteArmed, setDeleteArmed] = useState(false);
-  const [dangerMsg, setDangerMsg] = useState<{
-    type: "ok" | "err";
-    text: string;
-  } | null>(null);
+  const [profileName, setProfileName] = useState("");
+  const [changeEmailValue, setChangeEmailValue] = useState("");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    getClientFeatureFlags()
-      .then((d) => setStripeEnabled(d.stripe))
-      .catch(() => {});
+    setProfileName(user?.name ?? "");
+    setChangeEmailValue(user?.email ?? "");
+  }, [user?.email, user?.name]);
+
+  const runBusy = async (key: string, work: () => Promise<void>) => {
+    setBusyKey(key);
+    setError("");
+    try { await work(); } finally { setBusyKey(null); }
+  };
+
+  const handleProfileUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await runBusy("profile", async () => {
+      const result = await authClient.updateUser({
+        name: profileName,
+      });
+      if (extractError(result)) {
+        setError(formatError(result, "We could not update your profile."));
+        return;
+      }
+      setNotice("Your profile has been updated.");
+      await refetch();
+      router.refresh();
+    });
+  };
+
+  const handleResendVerification = async () => {
+    const email = user?.email;
+    if (!email) return;
+    await runBusy("verify", async () => {
+      const result = await authClient.sendVerificationEmail({
+        email,
+        callbackURL: "/login?verified=1",
+      });
+      if (extractError(result)) {
+        setError(formatError(result, "We could not resend the verification email."));
+        return;
+      }
+      setNotice("Verification email sent. Check your inbox.");
+    });
+  };
+
+  const handleChangeEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await runBusy("email", async () => {
+      const result = await authClient.changeEmail({
+        newEmail: changeEmailValue,
+        callbackURL: "/dashboard/settings?notice=email-changed",
+      });
+      if (extractError(result)) {
+        setError(formatError(result, "We could not start the email change flow."));
+        return;
+      }
+      setNotice("Approve the change from your current email, then verify the new address from your inbox.");
+    });
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notice") === "email-changed") {
+      setNotice("Your new email has been verified and applied.");
+    }
   }, []);
 
-  useEffect(() => {
-    if (!session?.user) return;
-    setName(session.user.name ?? "");
-    setUsernameVal(
-      ((session.user as Record<string, unknown>).username as string) ?? "",
-    );
-    setTwoFAEnabled(
-      !!(session.user as Record<string, unknown>).twoFactorEnabled,
-    );
-  }, [session?.user]);
-
-  useEffect(() => {
-    if (!session) return;
-    setSessionsLoading(true);
-    authClient
-      .listSessions()
-      .then((res) => {
-        if (res.data) setSessions(res.data as unknown as SessionInfo[]);
-      })
-      .catch(() =>
-        setSessionMsg({ type: "err", text: "Could not load sessions." }),
-      )
-      .finally(() => setSessionsLoading(false));
-  }, [session]);
-
-  useEffect(() => {
-    if (!session) return;
-    setPasskeysLoading(true);
-    authClient.passkey
-      .listUserPasskeys()
-      .then((res) => {
-        if (res.data) setPasskeys(res.data as PasskeyInfo[]);
-      })
-      .catch(() =>
-        setPasskeyMsg({ type: "err", text: "Could not load passkeys." }),
-      )
-      .finally(() => setPasskeysLoading(false));
-  }, [session]);
-
-  const handleUpdateProfile = async () => {
-    setIsUpdating(true);
-    setProfileMsg(null);
-    try {
-      await authClient.updateUser({
-        name,
-        ...(usernameVal.trim() ? { username: usernameVal.trim() } : {}),
-      });
-      setProfileMsg("Profile updated.");
-    } catch {
-      setProfileMsg("Failed to update profile.");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPw !== confirmPw) {
-      setPwMsg({ type: "err", text: "Passwords do not match." });
-      return;
-    }
-    if (newPw.length < 8) {
-      setPwMsg({
-        type: "err",
-        text: "Password must be at least 8 characters.",
-      });
-      return;
-    }
-    setPwLoading(true);
-    setPwMsg(null);
-    try {
-      const result = await authClient.changePassword({
-        currentPassword: currentPw,
-        newPassword: newPw,
-        revokeOtherSessions: true,
-      });
-      if (result.error) throw new Error(result.error.message);
-      setPwMsg({
-        type: "ok",
-        text: "Password changed. Other sessions revoked.",
-      });
-      setCurrentPw("");
-      setNewPw("");
-      setConfirmPw("");
-    } catch (err: unknown) {
-      setPwMsg({
-        type: "err",
-        text: err instanceof Error ? err.message : "Failed to change password.",
-      });
-    } finally {
-      setPwLoading(false);
-    }
-  };
-
-  const handleEnable2FA = async () => {
-    if (!twoFAPassword) return;
-    setTwoFALoading(true);
-    setTwoFAError(null);
-    try {
-      const result = await authClient.twoFactor.enable({
-        password: twoFAPassword,
-      });
-      if (result.error) throw new Error(result.error.message);
-      setTotpURI(result.data?.totpURI ?? null);
-      setBackupCodes(result.data?.backupCodes ?? []);
-      setTwoFAStep("qr");
-    } catch (err: unknown) {
-      setTwoFAError(
-        err instanceof Error ? err.message : "Failed to enable 2FA.",
-      );
-    } finally {
-      setTwoFALoading(false);
-    }
-  };
-
-  const handleVerify2FA = async () => {
-    if (!verifyCode.trim()) return;
-    setTwoFALoading(true);
-    setTwoFAError(null);
-    try {
-      const result = await authClient.twoFactor.verifyTotp({
-        code: verifyCode.trim(),
-      });
-      if (result.error) throw new Error(result.error.message);
-      setTwoFAEnabled(true);
-      setTwoFAStep("backup");
-    } catch (err: unknown) {
-      setTwoFAError(err instanceof Error ? err.message : "Invalid code.");
-    } finally {
-      setTwoFALoading(false);
-    }
-  };
-
-  const handleDisable2FA = async () => {
-    if (!twoFAPassword) return;
-    setTwoFALoading(true);
-    setTwoFAError(null);
-    try {
-      const result = await authClient.twoFactor.disable({
-        password: twoFAPassword,
-      });
-      if (result.error) throw new Error(result.error.message);
-      setTwoFAEnabled(false);
-      setTwoFAStep("idle");
-      setTwoFAPassword("");
-    } catch (err: unknown) {
-      setTwoFAError(
-        err instanceof Error ? err.message : "Failed to disable 2FA.",
-      );
-    } finally {
-      setTwoFALoading(false);
-    }
-  };
-
-  const handleRevokeSession = async (s: SessionInfo) => {
-    setSessionMsg(null);
-    setRevokingId(s.id);
-    try {
-      await authClient.revokeSession({ token: s.token });
-      setSessions((prev) => prev.filter((x) => x.id !== s.id));
-      setSessionMsg({ type: "ok", text: "Session revoked." });
-    } catch {
-      setSessionMsg({ type: "err", text: "Could not revoke session." });
-    } finally {
-      setRevokingId(null);
-    }
-  };
-
-  const handleRevokeAllOther = async () => {
-    setSessionMsg(null);
-    setRevokingId("all");
-    try {
-      await authClient.revokeSessions();
-      const res = await authClient.listSessions();
-      if (res.data) setSessions(res.data as unknown as SessionInfo[]);
-      setSessionMsg({ type: "ok", text: "All other sessions revoked." });
-    } catch {
-      setSessionMsg({ type: "err", text: "Could not revoke sessions." });
-    } finally {
-      setRevokingId(null);
-    }
-  };
-
-  const handleAddPasskey = async () => {
-    setPasskeyActionLoading("add");
-    setPasskeyMsg(null);
-    try {
-      const result = await authClient.passkey.addPasskey({
-        name: passkeyName.trim() || "This device",
-      });
-      if (result.error) throw new Error(result.error.message);
-      const listed = await authClient.passkey.listUserPasskeys();
-      if (listed.data) setPasskeys(listed.data as PasskeyInfo[]);
-      setPasskeyName("");
-      setPasskeyMsg({ type: "ok", text: "Passkey added." });
-    } catch (err: unknown) {
-      setPasskeyMsg({
-        type: "err",
-        text:
-          err instanceof Error ? err.message : "Could not register passkey.",
-      });
-    } finally {
-      setPasskeyActionLoading(null);
-    }
-  };
-
-  const handleDeletePasskey = async (id: string) => {
-    setPasskeyActionLoading(id);
-    setPasskeyMsg(null);
-    try {
-      const result = await authClient.passkey.deletePasskey({ id });
-      if (result.error) throw new Error(result.error.message);
-      setPasskeys((prev) => prev.filter((p) => p.id !== id));
-      setPasskeyMsg({ type: "ok", text: "Passkey removed." });
-    } catch (err: unknown) {
-      setPasskeyMsg({
-        type: "err",
-        text: err instanceof Error ? err.message : "Could not delete passkey.",
-      });
-    } finally {
-      setPasskeyActionLoading(null);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!deleteArmed) {
-      setDeleteArmed(true);
-      setDangerMsg({
-        type: "err",
-        text: "Click delete again to confirm permanent account deletion.",
-      });
-      return;
-    }
-    setDangerMsg(null);
-    setIsDeleting(true);
-    try {
-      const result = await authClient.deleteUser({ callbackURL: "/" });
-      if (result?.error)
-        throw new Error(result.error.message ?? "Failed to delete account.");
-    } catch (err: unknown) {
-      setDangerMsg({
-        type: "err",
-        text: err instanceof Error ? err.message : "Failed to delete account.",
-      });
-      setDeleteArmed(false);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  if (isPending) {
+  if (isPending || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#09090b]">
-        <span className="size-5 animate-spin rounded-full border-2 border-neutral-800 border-t-white" />
+      <div className="panel p-8 text-sm text-zinc-500">
+        Loading profile...
       </div>
     );
   }
 
-  const displayName = session?.user.name ?? "User";
-  const roleValue = (session?.user as Record<string, unknown> | undefined)
-    ?.role;
-  const roleTags = parseUserRoles(roleValue);
-  const canManageBilling = hasPermission(roleValue, "billing:manage");
-
   return (
-    <DashboardShell
-      sectionLabel="Settings"
-      stripeEnabled={stripeEnabled}
-      user={{
-        image: session?.user.image,
-        name: session?.user.name,
-        email: session?.user.email,
-      }}
-      headerActions={
-        <Link
-          href="/dashboard"
-          className="rounded-lg border border-neutral-800/60 px-3 py-1.5 text-xs text-neutral-600 transition hover:text-white"
-        >
-          Back to overview
-        </Link>
-      }
-    >
-      <main className="flex-1 overflow-y-auto px-6 py-8">
-        <div className="animate-fade-in mx-auto max-w-3xl space-y-6">
-          <div>
-            <h1 className="font-[family-name:var(--font-geist-mono)] text-2xl tracking-tight text-white">
-              Account settings
-            </h1>
-            <p className="mt-2 text-sm text-neutral-500">
-              Manage your profile, security, and active sessions.
+    <div className="space-y-4 max-w-2xl">
+      {notice && <Banner tone="success">{notice}</Banner>}
+      {error && <Banner tone="error">{error}</Banner>}
+
+      {/* Profile section */}
+      <div className="panel">
+        <div className="panel-header">
+          <h2 className="heading-section">Profile</h2>
+          <p className="text-[12px] text-zinc-500 mt-0.5">Keep your public account details current.</p>
+        </div>
+        <div className="panel-body">
+          <form onSubmit={handleProfileUpdate} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="profile-name" className="text-[12px] text-zinc-400">Display name</Label>
+                <Input
+                  id="profile-name"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="Your name"
+                  className="bg-white/[0.03] border-white/[0.08] focus:border-white/25"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-email" className="text-[12px] text-zinc-400">Email</Label>
+                <Input
+                  id="profile-email"
+                  value={user.email ?? ""}
+                  disabled
+                  className="bg-white/[0.02] border-white/[0.06] text-zinc-500"
+                />
+              </div>
+            </div>
+            <p className="text-[12px] text-zinc-500">
+              Avatar management lives in the Files tab when uploads are enabled.
             </p>
+            <Button type="submit" disabled={busyKey === "profile"} className="h-9 text-[13px]">
+              {busyKey === "profile" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+              Save changes
+            </Button>
+          </form>
+        </div>
+      </div>
+
+      {/* Email section */}
+      <div className="panel">
+        <div className="panel-header">
+          <h2 className="heading-section">Email</h2>
+          <p className="text-[12px] text-zinc-500 mt-0.5">Verification status and email change.</p>
+        </div>
+        <div className="panel-body space-y-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-[13px] font-medium text-white">Verification status</h3>
+              <p className="mt-1 text-[12px] text-zinc-500">
+                {user.emailVerified
+                  ? "Your email address is verified."
+                  : "Verify your email to keep password sign-in available."}
+              </p>
+            </div>
+            {!user.emailVerified && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResendVerification}
+                disabled={busyKey === "verify"}
+                className="h-9 text-[13px] shrink-0"
+              >
+                {busyKey === "verify" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                Resend email
+              </Button>
+            )}
           </div>
 
-          {/* Profile */}
-          <section className="rounded-xl border border-neutral-800/60 p-5">
-            <h2 className="text-sm font-medium text-white">Profile</h2>
-            <div className="mt-4 flex items-center gap-4">
-              <DashboardAvatar
-                image={session?.user.image}
-                name={session?.user.name}
-                email={session?.user.email}
-                size="lg"
-              />
-              <div>
-                <p className="text-sm font-medium text-white">{displayName}</p>
-                <p className="text-xs text-neutral-600">
-                  {session?.user.email}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {roleTags.map((role) => (
-                    <span
-                      key={role}
-                      className="rounded-md border border-neutral-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400"
-                    >
-                      {role}
-                    </span>
-                  ))}
-                  {canManageBilling && (
-                    <span className="rounded-md border border-neutral-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">
-                      billing-manage
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="display-name"
-                  className="mb-1.5 block text-xs font-medium text-neutral-500"
-                >
-                  Display name
-                </label>
-                <input
-                  id="display-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white transition focus:border-neutral-600 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="username"
-                  className="mb-1.5 block text-xs font-medium text-neutral-500"
-                >
-                  Username
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={usernameVal}
-                  onChange={(e) => setUsernameVal(e.target.value)}
-                  placeholder="optional"
-                  className="w-full rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white transition focus:border-neutral-600 focus:outline-none placeholder:text-neutral-700"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="email-address"
-                  className="mb-1.5 block text-xs font-medium text-neutral-500"
-                >
-                  Email
-                </label>
-                <input
-                  id="email-address"
-                  type="text"
-                  value={session?.user.email ?? ""}
-                  disabled
-                  className="w-full rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-neutral-600 opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-            {profileMsg && (
-              <p className="mt-3 text-xs text-neutral-400">{profileMsg}</p>
-            )}
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={handleUpdateProfile}
-                disabled={
-                  isUpdating || (name === session?.user.name && !usernameVal)
-                }
-                className="rounded-lg bg-white px-4 py-2 text-xs font-medium text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isUpdating ? "Saving..." : "Save changes"}
-              </button>
-            </div>
-          </section>
-
-          {/* Security */}
-          <section className="rounded-xl border border-neutral-800/60 p-5 space-y-4">
-            <h2 className="text-sm font-medium text-white">Security</h2>
-
-            {/* Passkeys */}
-            <div className="rounded-lg border border-neutral-800/60 p-4">
-              <p className="text-sm font-medium text-white">Passkeys</p>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                Passwordless sign-in with biometrics, PIN, or security keys.
-              </p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="text"
-                  value={passkeyName}
-                  onChange={(e) => setPasskeyName(e.target.value)}
-                  placeholder="Name this device (optional)"
-                  className="flex-1 rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white outline-none transition focus:border-neutral-600 placeholder:text-neutral-700"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddPasskey}
-                  disabled={passkeyActionLoading === "add"}
-                  className="rounded-lg bg-white px-3 py-2 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-50"
-                >
-                  {passkeyActionLoading === "add"
-                    ? "Registering..."
-                    : "Add passkey"}
-                </button>
-              </div>
-              <div className="mt-3 space-y-1.5">
-                {passkeysLoading ? (
-                  <p className="text-xs text-neutral-700">
-                    Loading passkeys...
-                  </p>
-                ) : passkeys.length === 0 ? (
-                  <p className="text-xs text-neutral-700">
-                    No passkeys registered yet.
-                  </p>
-                ) : (
-                  passkeys.map((pk) => (
-                    <div
-                      key={pk.id}
-                      className="flex items-center justify-between rounded-lg border border-neutral-800/60 px-3 py-2.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-neutral-300">
-                          {pk.name || "Unnamed passkey"}
-                        </p>
-                        <p className="mt-0.5 text-[10px] text-neutral-700">
-                          Added{" "}
-                          {pk.createdAt
-                            ? new Date(pk.createdAt).toLocaleDateString()
-                            : "recently"}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePasskey(pk.id)}
-                        disabled={passkeyActionLoading === pk.id}
-                        className="ml-3 shrink-0 rounded-md border border-red-900/50 px-2 py-1 text-[10px] font-medium text-red-400 transition hover:bg-red-950/30 disabled:opacity-50"
-                      >
-                        {passkeyActionLoading === pk.id ? "..." : "Delete"}
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-              {passkeyMsg && (
-                <p
-                  className={`mt-2 text-xs ${passkeyMsg.type === "ok" ? "text-neutral-400" : "text-red-400"}`}
-                >
-                  {passkeyMsg.text}
-                </p>
-              )}
-            </div>
-
-            {/* 2FA */}
-            <div className="rounded-lg border border-neutral-800/60 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    Two-factor authentication
-                  </p>
-                  <p className="mt-0.5 text-xs text-neutral-600">
-                    {twoFAEnabled
-                      ? "TOTP is enabled."
-                      : "Add extra security with an authenticator app."}
-                  </p>
-                </div>
-                <span
-                  className={`rounded-md border px-2 py-0.5 text-[10px] font-medium ${twoFAEnabled ? "border-neutral-700 text-white" : "border-neutral-800 text-neutral-600"}`}
-                >
-                  {twoFAEnabled ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-
-              {twoFAStep === "idle" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTwoFAStep("password");
-                    setTwoFAPassword("");
-                    setTwoFAError(null);
-                  }}
-                  className="mt-3 rounded-lg border border-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-500 transition hover:border-neutral-700 hover:text-white"
-                >
-                  {twoFAEnabled ? "Disable 2FA" : "Enable 2FA"}
-                </button>
-              )}
-
-              {twoFAStep === "password" && (
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <label
-                      htmlFor="twofa-pw"
-                      className="mb-1 block text-xs text-neutral-600"
-                    >
-                      Enter your password
-                    </label>
-                    <input
-                      id="twofa-pw"
-                      type="password"
-                      value={twoFAPassword}
-                      onChange={(e) => setTwoFAPassword(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" &&
-                        (twoFAEnabled ? handleDisable2FA() : handleEnable2FA())
-                      }
-                      className="w-full rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white outline-none transition focus:border-neutral-600"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={twoFALoading || !twoFAPassword}
-                      onClick={
-                        twoFAEnabled ? handleDisable2FA : handleEnable2FA
-                      }
-                      className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-50"
-                    >
-                      {twoFALoading
-                        ? "..."
-                        : twoFAEnabled
-                          ? "Disable"
-                          : "Continue"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTwoFAStep("idle")}
-                      className="rounded-lg border border-neutral-800 px-3 py-1.5 text-xs text-neutral-500 hover:text-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {twoFAError && (
-                    <p className="text-xs text-red-400">{twoFAError}</p>
-                  )}
-                </div>
-              )}
-
-              {twoFAStep === "qr" && totpURI && (
-                <div className="mt-3 space-y-3">
-                  <p className="text-xs text-neutral-500">
-                    Scan with your authenticator app:
-                  </p>
-                  <div className="flex justify-center rounded-lg border border-neutral-800 bg-white p-4">
-                    <Image
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpURI)}`}
-                      alt="TOTP QR Code"
-                      width={200}
-                      height={200}
-                    />
-                  </div>
-                  <details className="text-xs text-neutral-600">
-                    <summary className="cursor-pointer hover:text-white">
-                      Can&apos;t scan? Copy URI
-                    </summary>
-                    <code className="mt-2 block break-all rounded-lg bg-neutral-900 p-3 text-neutral-400">
-                      {totpURI}
-                    </code>
-                  </details>
-                  <div>
-                    <label
-                      htmlFor="verify-totp"
-                      className="mb-1 block text-xs text-neutral-600"
-                    >
-                      6-digit code
-                    </label>
-                    <input
-                      id="verify-totp"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={verifyCode}
-                      onChange={(e) =>
-                        setVerifyCode(e.target.value.replace(/\D/g, ""))
-                      }
-                      onKeyDown={(e) => e.key === "Enter" && handleVerify2FA()}
-                      placeholder="000000"
-                      className="w-full rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-center font-mono text-lg tracking-[0.5em] text-white outline-none transition focus:border-neutral-600"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={twoFALoading || verifyCode.length < 6}
-                    onClick={handleVerify2FA}
-                    className="w-full rounded-lg bg-white px-3 py-2 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-50"
-                  >
-                    {twoFALoading ? "Verifying..." : "Verify & Enable"}
-                  </button>
-                  {twoFAError && (
-                    <p className="text-xs text-red-400">{twoFAError}</p>
-                  )}
-                </div>
-              )}
-
-              {twoFAStep === "backup" && backupCodes.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  <div className="rounded-lg border border-neutral-700 bg-neutral-900 p-3">
-                    <p className="text-xs font-medium text-white">
-                      Save your backup codes
-                    </p>
-                    <p className="mt-1 text-[11px] text-neutral-500">
-                      Each code can only be used once.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-neutral-800 p-3 font-mono text-sm text-neutral-400">
-                    {backupCodes.map((code) => (
-                      <span key={code}>{code}</span>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFAStep("idle");
-                      setTwoFAPassword("");
-                      setVerifyCode("");
-                    }}
-                    className="w-full rounded-lg bg-white px-3 py-2 text-xs font-medium text-black hover:bg-neutral-200"
-                  >
-                    Done
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Change Password */}
-            <div className="rounded-lg border border-neutral-800/60 p-4">
-              <p className="text-sm font-medium text-white">Change password</p>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                This will revoke all other sessions.
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <input
-                  type="password"
-                  value={currentPw}
-                  onChange={(e) => setCurrentPw(e.target.value)}
-                  placeholder="Current"
-                  className="rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white outline-none transition focus:border-neutral-600 placeholder:text-neutral-700"
-                />
-                <input
-                  type="password"
-                  value={newPw}
-                  onChange={(e) => setNewPw(e.target.value)}
-                  placeholder="New"
-                  className="rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white outline-none transition focus:border-neutral-600 placeholder:text-neutral-700"
-                />
-                <input
-                  type="password"
-                  value={confirmPw}
-                  onChange={(e) => setConfirmPw(e.target.value)}
-                  placeholder="Confirm"
-                  onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
-                  className="rounded-lg border border-neutral-800 bg-transparent px-3 py-2 text-sm text-white outline-none transition focus:border-neutral-600 placeholder:text-neutral-700"
-                />
-              </div>
-              {pwMsg && (
-                <p
-                  className={`mt-2 text-xs ${pwMsg.type === "ok" ? "text-neutral-400" : "text-red-400"}`}
-                >
-                  {pwMsg.text}
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={pwLoading || !currentPw || !newPw || !confirmPw}
-                onClick={handleChangePassword}
-                className="mt-3 rounded-lg border border-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-500 transition hover:border-neutral-700 hover:text-white disabled:opacity-50"
-              >
-                {pwLoading ? "Changing..." : "Change password"}
-              </button>
-            </div>
-
-            {/* Sessions */}
-            <div className="rounded-lg border border-neutral-800/60 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    Active sessions
-                  </p>
-                  <p className="mt-0.5 text-xs text-neutral-600">
-                    Manage devices where you&apos;re signed in.
-                  </p>
-                </div>
-                {sessions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={handleRevokeAllOther}
-                    disabled={revokingId === "all"}
-                    className="rounded-lg border border-red-900/50 px-3 py-1 text-[10px] font-medium text-red-400 transition hover:bg-red-950/30 disabled:opacity-50"
-                  >
-                    {revokingId === "all" ? "Revoking..." : "Revoke all others"}
-                  </button>
-                )}
-              </div>
-              <div className="mt-3 space-y-1.5">
-                {sessionsLoading ? (
-                  <p className="text-xs text-neutral-700">Loading...</p>
-                ) : sessions.length === 0 ? (
-                  <p className="text-xs text-neutral-700">No sessions.</p>
-                ) : (
-                  sessions.map((s) => {
-                    const isCurrent = s.token === session?.session?.token;
-                    return (
-                      <div
-                        key={s.id}
-                        className="flex items-center justify-between rounded-lg border border-neutral-800/60 px-3 py-2.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-neutral-300">
-                            {s.userAgent
-                              ? parseUA(s.userAgent)
-                              : "Unknown device"}
-                            {isCurrent && (
-                              <span className="ml-2 text-neutral-500">
-                                (current)
-                              </span>
-                            )}
-                          </p>
-                          <p className="mt-0.5 text-[10px] text-neutral-700">
-                            {s.ipAddress ?? "Unknown IP"} ·{" "}
-                            {new Date(s.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        {!isCurrent && (
-                          <button
-                            type="button"
-                            onClick={() => handleRevokeSession(s)}
-                            disabled={revokingId === s.id}
-                            className="ml-3 shrink-0 rounded-md border border-neutral-800 px-2 py-1 text-[10px] font-medium text-neutral-500 transition hover:border-red-900/50 hover:text-red-400 disabled:opacity-50"
-                          >
-                            {revokingId === s.id ? "..." : "Revoke"}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              {sessionMsg && (
-                <p
-                  className={`mt-2 text-xs ${sessionMsg.type === "ok" ? "text-neutral-400" : "text-red-400"}`}
-                >
-                  {sessionMsg.text}
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Danger Zone */}
-          <section className="rounded-xl border border-red-900/30 p-5">
-            <h2 className="text-sm font-medium text-red-300">Danger zone</h2>
-            <p className="mt-1.5 text-xs text-neutral-600">
-              Permanently delete your account and all associated data. This
-              cannot be undone.
+          <div className="border-t border-white/[0.06] pt-5">
+            <h3 className="text-[13px] font-medium text-white">Change email</h3>
+            <p className="mt-1 text-[12px] text-zinc-500">
+              We&apos;ll ask you to approve the change from your current inbox, then verify the new address.
             </p>
-            {dangerMsg && (
-              <p
-                className={`mt-3 text-xs ${dangerMsg.type === "ok" ? "text-neutral-400" : "text-red-400"}`}
-              >
-                {dangerMsg.text}
-              </p>
-            )}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-                className="rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-2 text-xs font-medium text-red-300 transition hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isDeleting
-                  ? "Deleting..."
-                  : deleteArmed
-                    ? "Confirm delete account"
-                    : "Delete account"}
-              </button>
-              {deleteArmed && !isDeleting && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeleteArmed(false);
-                    setDangerMsg(null);
-                  }}
-                  className="rounded-lg border border-neutral-800 px-4 py-2 text-xs font-medium text-neutral-400 transition hover:border-neutral-700 hover:text-white"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </section>
+            <form onSubmit={handleChangeEmail} className="mt-3 flex flex-col gap-3 sm:flex-row">
+              <Input
+                type="email"
+                value={changeEmailValue}
+                onChange={(e) => setChangeEmailValue(e.target.value)}
+                placeholder="new-email@example.com"
+                className="bg-white/[0.03] border-white/[0.08] focus:border-white/25"
+              />
+              <Button type="submit" disabled={busyKey === "email"} className="h-9 text-[13px] shrink-0">
+                {busyKey === "email" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                Change email
+              </Button>
+            </form>
+          </div>
         </div>
-      </main>
-    </DashboardShell>
+      </div>
+    </div>
   );
 }
