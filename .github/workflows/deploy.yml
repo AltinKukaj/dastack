@@ -55,8 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Dokploy Deployment
+        continue-on-error: true
         run: |
-          curl -X POST "${{ env.DOKPLOY_URL }}/api/application.deploy" \
+          curl -fSs --connect-timeout 30 --max-time 60 \
+            -X POST "${{ env.DOKPLOY_URL }}/api/application.deploy" \
             -H "Authorization: Bearer ${{ env.DOKPLOY_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"applicationId\": \"${{ env.DOKPLOY_APPLICATION_ID }}\"}"
+            -d "{\"applicationId\": \"${{ env.DOKPLOY_APPLICATION_ID }}\"}" \
+            && echo "Deployment triggered successfully" \
+            || echo "::warning::Dokploy deployment trigger failed — VPS may be unreachable"
