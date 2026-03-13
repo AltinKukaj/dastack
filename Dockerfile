@@ -1,42 +1,80 @@
-# Build stage
-FROM node:22-alpine AS builder
+# Production-ready Universal Dockerfile for Next.js
+# Supports pnpm, npm, and bun via auto-detection
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Stage 1: Base
+FROM node:22-alpine AS base
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY prisma ./prisma/
+# Stage 2: Dependencies
+FROM base AS deps
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* bun.lockb* ./
 
-RUN pnpm install --frozen-lockfile
+RUN \
+  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
+  elif [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+  elif [ -f bun.lockb ]; then corepack enable bun && bun install --frozen-lockfile; \
+  else echo "Lockfile not found." && exit 1; \
+  fi
 
+# Stage 3: Builder
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Placeholder env vars for build (validated at build time; override at runtime)
+# Environment variables for build time (Next.js validates these)
 ENV DATABASE_URL="postgresql://localhost:5432/dummy"
 ENV BETTER_AUTH_SECRET="build-placeholder"
 ENV BETTER_AUTH_URL="https://localhost:3000"
 ENV NEXT_PUBLIC_APP_URL="https://localhost:3000"
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm exec prisma generate
-RUN pnpm build
+# Generate Prisma client and build
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && \
+    pnpm exec prisma generate && \
+    pnpm run build; \
+  elif [ -f package-lock.json ]; then \
+    npx prisma generate && \
+    npm run build; \
+  elif [ -f yarn.lock ]; then \
+    yarn prisma generate && \
+    yarn build; \
+  elif [ -f bun.lockb ]; then \
+    corepack enable bun && \
+    bun x prisma generate && \
+    bun run build; \
+  else \
+    echo "Lockfile not found." && exit 1; \
+  fi
 
-# Run stage
-FROM node:22-alpine AS runner
-
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Stage 4: Runner
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/pnpm-lock.yaml ./
-COPY --from=builder /app/pnpm-workspace.yaml ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
+# Security: Run as non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy essential files for standalone mode
 COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Optional: Copy prisma directory if needed for migrations at runtime
 COPY --from=builder /app/prisma ./prisma
+
+USER nextjs
 
 EXPOSE 3000
 
-CMD ["pnpm", "start"]
+# server.js is created by next build when output: "standalone" is set
+CMD ["node", "server.js"]
