@@ -1,0 +1,44 @@
+# Build artifacts
+.next
+out
+build
+dist
+
+# Dependencies
+node_modules
+.pnpm-store
+.npm
+.yarn
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.example
+
+# Git
+.git
+.gitignore
+.github
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+.vscode
+.idea
+.DS_Store
+*.md
+LICENSE
+prisma/dev.db
+prisma/dev.db-journal
