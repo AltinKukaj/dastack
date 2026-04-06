@@ -50,16 +50,16 @@ function PlanCard({
   const isFree = plan.slug === "free";
   const isCurrentPlan = currentPlanSlug === plan.slug;
 
-  const cardClasses = `animate-fade-in relative flex flex-col rounded-md border p-5 sm:p-6 transition-colors ${
+  const cardClasses = `animate-fade-in relative flex h-full min-h-0 flex-col rounded-md border p-5 sm:p-6 transition-colors ${
     plan.highlighted
       ? "border-white/[0.1] bg-white/[0.04]"
       : "border-white/[0.06] bg-white/[0.02]"
   }`;
 
   const secondaryButtonClasses =
-    "flex w-full items-center justify-center rounded-md border border-white/[0.08] py-2.5 text-sm font-medium text-zinc-400 transition-colors duration-150 hover:border-white/[0.16] hover:text-white disabled:cursor-not-allowed disabled:opacity-50";
+    "flex w-full min-w-0 items-center justify-center rounded-md border border-white/[0.08] px-4 py-2.5 text-center text-sm font-medium text-zinc-400 transition-colors duration-150 hover:border-white/[0.16] hover:text-white disabled:cursor-not-allowed disabled:opacity-50";
 
-  const primaryButtonClasses = `w-full rounded-md py-2.5 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
+  const primaryButtonClasses = `flex w-full min-w-0 items-center justify-center rounded-md px-4 py-2.5 text-center text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
     plan.highlighted
       ? "bg-white text-black hover:opacity-85"
       : "border border-white/[0.08] text-zinc-400 hover:border-white/[0.16] hover:text-white"
@@ -90,7 +90,7 @@ function PlanCard({
 
       <div className="my-5 h-px bg-white/[0.06]" />
 
-      <ul className="flex-1 space-y-2.5">
+      <ul className="min-h-0 flex-1 space-y-2.5">
         {plan.features.map((feature) => (
           <li
             key={feature}
@@ -102,7 +102,7 @@ function PlanCard({
         ))}
       </ul>
 
-      <div className="mt-6">
+      <div className="mt-auto flex w-full shrink-0 flex-col pt-6">
         {isFree ? (
           <Link
             href={isLoggedIn ? "/dashboard" : "/login?tab=sign-up"}
@@ -386,7 +386,7 @@ export default function PricingClient({
             </div>
           )}
 
-          <div className="mt-10 grid gap-4 lg:grid-cols-3">
+          <div className="mt-10 grid auto-rows-fr gap-4 lg:grid-cols-3">
             {plans.map((plan) => (
               <PlanCard
                 key={plan.slug}
